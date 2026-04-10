@@ -17,17 +17,16 @@ const fakeResult: SearchResult[] = [
 	{
 		url: url("/"),
 		meta: {
-			title: "This Is a Fake Search Result",
+			title: "这是一个模拟搜索结果",
 		},
-		excerpt:
-			"Because the search cannot work in the <mark>dev</mark> environment.",
+		excerpt: "因为搜索功能在 <mark>dev</mark> 环境下不可用。",
 	},
 	{
 		url: url("/"),
 		meta: {
-			title: "If You Want to Test the Search",
+			title: "如果你想测试搜索功能",
 		},
-		excerpt: "Try running <mark>npm build && npm preview</mark> instead.",
+		excerpt: "请改用 <mark>npm build && npm preview</mark> 进行测试。",
 	},
 ];
 
@@ -151,7 +150,7 @@ $: if (initialized && keywordMobile) {
 </div>
 
 <!-- toggle btn for phone/tablet view -->
-<button on:click={togglePanel} aria-label="Search Panel" id="search-switch"
+<button on:click={togglePanel} aria-label="搜索面板" id="search-switch"
         class="btn-plain scale-animation lg:!hidden rounded-lg w-11 h-11 active:scale-90">
     <Icon icon="material-symbols:search" class="text-[1.25rem]"></Icon>
 </button>
@@ -166,7 +165,7 @@ top-20 left-4 md:left-[unset] right-4 shadow-2xl rounded-2xl p-2">
       dark:bg-white/5 dark:hover:bg-white/10 dark:focus-within:bg-white/10
   ">
         <Icon icon="material-symbols:search" class="absolute text-[1.25rem] pointer-events-none ml-3 transition my-auto text-black/30 dark:text-white/30"></Icon>
-        <input placeholder="Search" bind:value={keywordMobile}
+		 <input placeholder={i18n(I18nKey.search)} bind:value={keywordMobile}
                class="pl-10 absolute inset-0 text-sm bg-transparent outline-0
                focus:w-60 text-black/50 dark:text-white/50"
         >

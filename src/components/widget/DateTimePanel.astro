@@ -1,0 +1,59 @@
+---
+const now = new Date();
+const initialDate = now.toLocaleDateString("zh-CN", {
+	year: "numeric",
+	month: "2-digit",
+	day: "2-digit",
+	weekday: "long",
+});
+const initialTime = now.toLocaleTimeString("zh-CN", {
+	hour12: false,
+});
+---
+
+<date-time-panel class="card-base p-4">
+	<div class="text-50 text-xs font-semibold tracking-wide">日期与时间</div>
+	<div data-date class="text-75 mt-2 text-sm font-medium">{initialDate}</div>
+	<div data-time class="text-90 mt-1 text-2xl font-bold tabular-nums">{initialTime}</div>
+</date-time-panel>
+
+<script>
+	class DateTimePanel extends HTMLElement {
+		connectedCallback() {
+			this.updateDateTime();
+			this.timerId = window.setInterval(() => {
+				this.updateDateTime();
+			}, 1000);
+		}
+
+		disconnectedCallback() {
+			if (this.timerId) {
+				window.clearInterval(this.timerId);
+			}
+		}
+
+		updateDateTime() {
+			const current = new Date();
+			const dateEl = this.querySelector("[data-date]");
+			const timeEl = this.querySelector("[data-time]");
+
+			if (dateEl) {
+				dateEl.textContent = current.toLocaleDateString("zh-CN", {
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+					weekday: "long",
+				});
+			}
+			if (timeEl) {
+				timeEl.textContent = current.toLocaleTimeString("zh-CN", {
+					hour12: false,
+				});
+			}
+		}
+	}
+
+	if (!customElements.get("date-time-panel")) {
+		customElements.define("date-time-panel", DateTimePanel);
+	}
+</script>

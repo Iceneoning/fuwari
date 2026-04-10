@@ -4,7 +4,7 @@ import "@fontsource/roboto/500.css";
 import "@fontsource/roboto/700.css";
 
 import ConfigCarrier from "@components/ConfigCarrier.astro";
-import { profileConfig, siteConfig } from "@/config";
+import { backgroundConfig, profileConfig, siteConfig } from "@/config";
 import {
 	AUTO_MODE,
 	BANNER_HEIGHT,
@@ -18,6 +18,7 @@ import {
 import { defaultFavicons } from "../constants/icon";
 import type { Favicon } from "../types/config";
 import { pathsEqual, url } from "../utils/url-utils";
+import { THEME_COLOR_PRESETS } from "../utils/setting-utils";
 import "katex/dist/katex.css";
 
 interface Props {
@@ -38,6 +39,7 @@ const isHomePage = pathsEqual(Astro.url.pathname, url("/"));
 // defines global css variables
 // why doing this in Layout instead of GlobalStyles: https://github.com/withastro/astro/issues/6728#issuecomment-1502203757
 const configHue = siteConfig.themeColor.hue;
+const themeColorPresets = THEME_COLOR_PRESETS;
 if (!banner || typeof banner !== "string" || banner.trim() === "") {
 	banner = siteConfig.banner.src;
 }
@@ -70,6 +72,10 @@ const bannerOffsetByPosition = {
 };
 const bannerOffset =
 	bannerOffsetByPosition[siteConfig.banner.position || "center"];
+const backgroundImageUrl =
+	backgroundConfig.src.startsWith("/")
+		? url(backgroundConfig.src)
+		: backgroundConfig.src;
 ---
 
 <!DOCTYPE html>
@@ -110,9 +116,11 @@ const bannerOffset =
 		))}
 
 		<!-- Set the theme before the page is rendered to avoid a flash -->
-		<script is:inline define:vars={{DEFAULT_THEME, LIGHT_MODE, DARK_MODE, AUTO_MODE, BANNER_HEIGHT_EXTEND, PAGE_WIDTH, configHue}}>
+		<script is:inline define:vars={{DEFAULT_THEME, LIGHT_MODE, DARK_MODE, AUTO_MODE, BANNER_HEIGHT_EXTEND, PAGE_WIDTH, configHue, themeColorPresets}}>
 			// Load the theme from local storage
 			const theme = localStorage.getItem('theme') || DEFAULT_THEME;
+			const themeColorStorageVersion = 'v2';
+			const themeColorVersionKey = 'theme-color-version';
 			switch (theme) {
 				case LIGHT_MODE:
 					document.documentElement.classList.remove('dark');
@@ -129,8 +137,30 @@ const bannerOffset =
 			}
 
 			// Load the hue from local storage
-			const hue = localStorage.getItem('hue') || configHue;
-			document.documentElement.style.setProperty('--hue', hue);
+			const parseHue = (value) => {
+				const parsed = Number.parseInt(String(value), 10);
+				return Number.isFinite(parsed) ? parsed : Number.parseInt(String(configHue), 10);
+			};
+			const getCircularDistance = (from, to) => {
+				const diff = Math.abs(from - to) % 360;
+				return Math.min(diff, 360 - diff);
+			};
+			if (localStorage.getItem(themeColorVersionKey) !== themeColorStorageVersion) {
+				localStorage.setItem(themeColorVersionKey, themeColorStorageVersion);
+				localStorage.setItem('hue', String(configHue));
+			}
+			const storedHue = parseHue(localStorage.getItem('hue') || configHue);
+			const normalizedHue = ((storedHue % 360) + 360) % 360;
+			const preset = themeColorPresets.reduce((closest, current) => {
+				return getCircularDistance(normalizedHue, current.hue) < getCircularDistance(normalizedHue, closest.hue)
+					? current
+					: closest;
+			});
+			localStorage.setItem('hue', String(preset.hue));
+			localStorage.setItem(themeColorVersionKey, themeColorStorageVersion);
+			document.documentElement.style.setProperty('--hue', String(preset.hue));
+			document.documentElement.style.setProperty('--primary', preset.hex);
+			document.documentElement.style.setProperty('--theme-chroma-scale', String(preset.chromaScale));
 
 			// calculate the --banner-height-extend, which needs to be a multiple of 4 to avoid blurry text
 			let offset = Math.floor(window.innerHeight * (BANNER_HEIGHT_EXTEND / 100));
@@ -151,11 +181,19 @@ const bannerOffset =
 	<body class=" min-h-screen transition " class:list={[{"lg:is-home": isHomePage, "enable-banner": enableBanner}]}
 		  data-overlayscrollbars-initialize
 	>
-		<ConfigCarrier></ConfigCarrier>
-		<slot />
+		{backgroundConfig.enable && (
+			<>
+				<div id="site-bg-image" aria-hidden="true" style={`background-image: url('${backgroundImageUrl}')`}></div>
+				<div id="site-bg-frosted" aria-hidden="true"></div>
+			</>
+		)}
+		<div id="site-content">
+			<ConfigCarrier></ConfigCarrier>
+			<slot />
 
-		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
-		<div id="page-height-extend" class="hidden h-[300vh]"></div>
+			<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
+			<div id="page-height-extend" class="hidden h-[300vh]"></div>
+		</div>
 	</body>
 </html>
 
@@ -163,9 +201,41 @@ const bannerOffset =
 	bannerOffset,
 	'banner-height-home': `${BANNER_HEIGHT_HOME}vh`,
 	'banner-height': `${BANNER_HEIGHT}vh`,
+	'site-bg-blur': `${backgroundConfig.blur}px`,
+	'site-bg-overlay-light': backgroundConfig.overlayLight,
+	'site-bg-overlay-dark': backgroundConfig.overlayDark,
+	'site-bg-scale': backgroundConfig.scale,
 }}>
 @tailwind components;
 @layer components {
+	#site-content {
+		position: relative;
+		z-index: 1;
+	}
+	#site-bg-image {
+		position: fixed;
+		inset: 0;
+		z-index: 0;
+		pointer-events: none;
+		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		transform: scale(var(--site-bg-scale));
+		transform-origin: center;
+		will-change: transform;
+	}
+	#site-bg-frosted {
+		position: fixed;
+		inset: 0;
+		z-index: 0;
+		pointer-events: none;
+		-webkit-backdrop-filter: blur(var(--site-bg-blur));
+		backdrop-filter: blur(var(--site-bg-blur));
+		background: rgba(255, 255, 255, var(--site-bg-overlay-light));
+	}
+	:root.dark #site-bg-frosted {
+		background: rgba(10, 14, 20, var(--site-bg-overlay-dark));
+	}
 	.enable-banner.is-home #banner-wrapper {
 		@apply h-[var(--banner-height-home)] translate-y-[var(--banner-height-extend)]
 	}

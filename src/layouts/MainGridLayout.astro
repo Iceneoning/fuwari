@@ -1,5 +1,6 @@
 ---
 import BackToTop from "@components/control/BackToTop.astro";
+import DateTimePanel from "@components/widget/DateTimePanel.astro";
 import Footer from "@components/Footer.astro";
 import Navbar from "@components/Navbar.astro";
 import SideBar from "@components/widget/SideBar.astro";
@@ -35,6 +36,7 @@ const {
 const hasBannerCredit =
 	siteConfig.banner.enable && siteConfig.banner.credit.enable;
 const hasBannerLink = !!siteConfig.banner.credit.url;
+const showDateTimePanel = headings.length === 0;
 
 const mainPanelTop = siteConfig.banner.enable
 	? `calc(${BANNER_HEIGHT}vh - ${MAIN_PANEL_OVERLAPS_BANNER_HEIGHT}rem)`
@@ -63,7 +65,7 @@ const mainPanelTop = siteConfig.banner.enable
 <div class="absolute w-full z-30 pointer-events-none" style={`top: ${mainPanelTop}`}>
     <!-- The pointer-events-none here prevent blocking the click event of the TOC -->
     <div class="relative max-w-[var(--page-width)] mx-auto pointer-events-auto">
-        <div id="main-grid" class="transition duration-700 w-full left-0 right-0 grid grid-cols-[17.5rem_auto] grid-rows-[auto_1fr_auto] lg:grid-rows-[auto]
+        <div id="main-grid" class="transition duration-700 w-full left-0 right-0 grid grid-cols-1 lg:grid-cols-[17.5rem_minmax(0,_1fr)] xl:grid-cols-[17.5rem_minmax(0,_1fr)_14rem] grid-rows-[auto_1fr_auto] lg:grid-rows-[auto]
     mx-auto gap-4 px-0 md:px-4"
         >
             <!-- Banner image credit -->
@@ -73,16 +75,16 @@ const mainPanelTop = siteConfig.banner.enable
             >
                 <Icon class="text-white/75 text-[1.25rem] mr-1" name="material-symbols:copyright-outline-rounded" ></Icon>
                 <div class="text-white/75 text-xs">{siteConfig.banner.credit.text}</div>
-                <Icon class:list={["transition absolute text-[oklch(0.75_0.14_var(--hue))] right-4 text-[0.75rem] opacity-0",
+                                <Icon class:list={["transition absolute text-[oklch(0.75_calc(0.14*var(--theme-chroma-scale))_var(--hue))] right-4 text-[0.75rem] opacity-0",
                     {"group-hover:opacity-100": hasBannerLink}]}
                       name="fa6-solid:arrow-up-right-from-square">
                 </Icon>
             </a>}
 
 
-            <SideBar class="mb-4 row-start-2 row-end-3 col-span-2 lg:row-start-1 lg:row-end-2 lg:col-span-1 lg:max-w-[17.5rem] onload-animation" headings={headings}></SideBar>
+            <SideBar class="mb-4 row-start-2 row-end-3 col-span-1 lg:row-start-1 lg:row-end-2 lg:col-span-1 lg:max-w-[17.5rem] onload-animation" headings={headings}></SideBar>
 
-            <main id="swup-container" class="transition-swup-fade col-span-2 lg:col-span-1 overflow-hidden">
+            <main id="swup-container" class="transition-swup-fade col-span-1 overflow-hidden">
                 <div id="content-wrapper" class="onload-animation">
                     <!-- the overflow-hidden here prevent long text break the layout-->
                     <!-- make id different from windows.swup global property -->
@@ -93,7 +95,15 @@ const mainPanelTop = siteConfig.banner.enable
                 </div>
             </main>
 
-            <div class="footer col-span-2 onload-animation block lg:hidden">
+            {showDateTimePanel && (
+                <aside class="hidden xl:block onload-animation" style="animation-delay: 250ms">
+                    <div class="sticky top-24 flex flex-col gap-4">
+                        <DateTimePanel></DateTimePanel>
+                    </div>
+                </aside>
+            )}
+
+            <div class="footer col-span-1 onload-animation block lg:hidden">
                 <Footer></Footer>
             </div>
         </div>
@@ -122,4 +132,16 @@ const mainPanelTop = siteConfig.banner.enable
         {!siteConfig.toc.enable && <div id="toc"></div>}
     </div>
 </div>
+
+<style is:global>
+    #main-grid .card-base {
+        background: rgba(255, 255, 255, 0.72);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+    }
+
+    :root.dark #main-grid .card-base {
+        background: rgba(21, 27, 38, 0.68);
+    }
+</style>
 </Layout>

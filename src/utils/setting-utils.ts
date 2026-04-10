@@ -7,24 +7,57 @@ import {
 import { expressiveCodeConfig } from "@/config";
 import type { LIGHT_DARK_MODE } from "@/types/config";
 
+type ThemeColorPreset = {
+	hue: number;
+	hex: string;
+	chromaScale: number;
+	label: string;
+};
+
+export const THEME_COLOR_PRESETS: ThemeColorPreset[] = [
+	{ hue: 34, hex: "#a59d9b", chromaScale: 0.08, label: "浅灰" },
+	{ hue: 298, hex: "#a18ccf", chromaScale: 0.85, label: "明亮紫" },
+	{ hue: 250, hex: "#2f8fff", chromaScale: 1, label: "湛蓝" },
+];
+
+function getCircularDistance(from: number, to: number): number {
+	const diff = Math.abs(from - to) % 360;
+	return Math.min(diff, 360 - diff);
+}
+
+function getClosestPreset(hue: number): ThemeColorPreset {
+	const normalizedHue = ((hue % 360) + 360) % 360;
+	return THEME_COLOR_PRESETS.reduce((closest, current) =>
+		getCircularDistance(normalizedHue, current.hue) <
+		getCircularDistance(normalizedHue, closest.hue)
+			? current
+			: closest,
+	);
+}
+
 export function getDefaultHue(): number {
 	const fallback = "250";
 	const configCarrier = document.getElementById("config-carrier");
-	return Number.parseInt(configCarrier?.dataset.hue || fallback, 10);
+	const defaultHue = Number.parseInt(configCarrier?.dataset.hue || fallback, 10);
+	return getClosestPreset(defaultHue).hue;
 }
 
 export function getHue(): number {
 	const stored = localStorage.getItem("hue");
-	return stored ? Number.parseInt(stored, 10) : getDefaultHue();
+	const hue = stored ? Number.parseInt(stored, 10) : getDefaultHue();
+	return getClosestPreset(hue).hue;
 }
 
 export function setHue(hue: number): void {
-	localStorage.setItem("hue", String(hue));
+	const preset = getClosestPreset(hue);
+	localStorage.setItem("hue", String(preset.hue));
 	const r = document.querySelector(":root") as HTMLElement;
 	if (!r) {
 		return;
 	}
-	r.style.setProperty("--hue", String(hue));
+	r.style.setProperty("--hue", String(preset.hue));
+	r.style.setProperty("--primary", preset.hex);
+	r.style.setProperty("--theme-chroma-scale", String(preset.chromaScale));
 }
 
 export function applyThemeToDocument(theme: LIGHT_DARK_MODE) {

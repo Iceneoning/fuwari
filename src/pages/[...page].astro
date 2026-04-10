@@ -1,10 +1,15 @@
 ---
+import path from "node:path";
 import type { GetStaticPaths } from "astro";
+import { Icon } from "astro-icon/components";
 import Pagination from "../components/control/Pagination.astro";
 import PostPage from "../components/PostPage.astro";
+import ImageWrapper from "../components/misc/ImageWrapper.astro";
 import { PAGE_SIZE } from "../constants/constants";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { formatDateToYYYYMMDD } from "../utils/date-utils";
 import { getSortedPosts } from "../utils/content-utils";
+import { getDir, getPostUrlBySlug } from "../utils/url-utils";
 
 export const getStaticPaths = (async ({ paginate }) => {
 	const allBlogPosts = await getSortedPosts();
@@ -15,9 +20,70 @@ export const getStaticPaths = (async ({ paginate }) => {
 const { page } = Astro.props;
 
 const len = page.data.length;
+const isFirstPage = page.currentPage === 1;
+const allPosts = isFirstPage ? await getSortedPosts() : [];
+const featuredPost = allPosts[0];
+const recapPosts = allPosts.slice(1, 4);
+const featuredImageBasePath = featuredPost?.data.image
+	? path.join("content/posts/", getDir(featuredPost.id))
+	: "";
 ---
 
 <MainGridLayout>
+	{isFirstPage && featuredPost && (
+		<section class="card-base p-4 onload-animation mb-4">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<span class="h-5 w-1 rounded-full bg-[var(--primary)]"></span>
+					<h2 class="text-xl font-bold text-90">启航</h2>
+				</div>
+				<a href="/archive/" class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold">
+					<span class="flex items-center gap-1">
+						查看全部
+						<Icon name="material-symbols:chevron-right-rounded" class="text-[1rem]"></Icon>
+					</span>
+				</a>
+			</div>
+			<div class="mt-4 grid grid-cols-1 lg:grid-cols-[18rem_minmax(0,_1fr)] gap-4">
+				<a href={getPostUrlBySlug(featuredPost.slug)} class="card-base overflow-hidden flex flex-col sm:flex-row">
+					{featuredPost.data.image && (
+						<div class="sm:w-60 w-full h-40 sm:h-auto">
+							<ImageWrapper
+								class="w-full h-full object-cover"
+								src={featuredPost.data.image}
+								basePath={featuredImageBasePath}
+								alt={featuredPost.data.title}
+							></ImageWrapper>
+						</div>
+					)}
+					<div class="p-4 flex-1 min-w-0">
+						<div class="text-50 text-xs font-semibold">崭新出炉</div>
+						<div class="text-90 text-lg font-bold mt-2 truncate">
+							{featuredPost.data.title}
+						</div>
+						<div class="text-30 text-xs mt-1">
+							{formatDateToYYYYMMDD(featuredPost.data.published)}
+						</div>
+						{featuredPost.data.description && (
+							<p class="text-50 text-sm mt-2 leading-6">
+								{featuredPost.data.description}
+							</p>
+						)}
+					</div>
+				</a>
+
+				<div class="flex flex-col gap-2">
+					<div class="text-50 text-xs font-semibold">精彩回顾</div>
+					{recapPosts.map((entry) => (
+						<a href={getPostUrlBySlug(entry.slug)} class="btn-card rounded-xl px-3 py-3 flex items-center justify-between gap-3">
+							<span class="text-75 font-medium truncate">{entry.data.title}</span>
+							<span class="text-30 text-xs whitespace-nowrap">{formatDateToYYYYMMDD(entry.data.published)}</span>
+						</a>
+					))}
+				</div>
+			</div>
+		</section>
+	)}
     <PostPage page={page}></PostPage>
     <Pagination class="mx-auto onload-animation" page={page} style={`animation-delay: calc(var(--content-delay) + ${(len)*50}ms)`}></Pagination>
 </MainGridLayout>
