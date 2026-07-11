@@ -1,0 +1,412 @@
+<script>
+// @ts-nocheck
+(() => {
+  const globalWindow = window;
+  if (globalWindow.__fuwariMouseSparkInit) {
+    return;
+  }
+  globalWindow.__fuwariMouseSparkInit = true;
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  if (prefersReducedMotion || isCoarsePointer) {
+    return;
+  }
+
+  const config = {
+    color: "45,175,255",
+    coreColor: "92,200,255",
+    scale: 1.5,
+    opacity: 1.0,
+    speed: 1.0,
+    maxTrail: 16,
+    alwaysTrail: true,
+  };
+
+  const canvasId = "fuwari-mouse-spark-canvas";
+  let canvas = document.getElementById(canvasId);
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    canvas = document.createElement("canvas");
+    canvas.id = canvasId;
+    canvas.setAttribute("aria-hidden", "true");
+    canvas.className = "fuwari-mouse-spark-canvas";
+    document.body.appendChild(canvas);
+  }
+
+  class MouseSpark {
+    constructor(targetCanvas, opts = {}) {
+      this.c = targetCanvas;
+      this.ctx = this.c.getContext("2d");
+      this.color = opts.color || "45,175,255";
+      this.coreColor = opts.coreColor || "92,200,255";
+      this.scale = opts.scale || 1.5;
+      this.opacity = opts.opacity || 1.0;
+      this.speed = opts.speed || 1.0;
+      this.maxTrail = opts.maxTrail || 16;
+
+      this.sparkPool = [];
+      this.wavePool = [];
+
+      this.waves = [];
+      this.sparks = [];
+      this.trail = [];
+      this.isDown = false;
+      this.lastPos = null;
+      this.baseFrameMs = 1000 / 60;
+      this.maxDeltaMs = 100;
+      this.lastFrameTime = performance.now();
+
+      this.initCanvas();
+      this.bindEvents();
+      requestAnimationFrame((now) => this.loop(now));
+    }
+
+    alpha(value) {
+      return Math.max(0, Math.min(1, value * this.opacity));
+    }
+
+    initCanvas() {
+      this.resize();
+      window.addEventListener("resize", () => this.resize());
+    }
+
+    resize() {
+      if (!this.ctx) {
+        return;
+      }
+      const dpr = window.devicePixelRatio || 1;
+      this.c.width = window.innerWidth * dpr;
+      this.c.height = window.innerHeight * dpr;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    bindEvents() {
+      const getPos = (event) => ({ x: event.clientX, y: event.clientY });
+      const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+      window.addEventListener("mousedown", (event) => {
+        this.isDown = true;
+        this.lastPos = getPos(event);
+        this.boom(this.lastPos.x, this.lastPos.y);
+      });
+
+      window.addEventListener("mousemove", (event) => {
+        if (!this.isDown && !window.enableAlwaysTrailEffect) {
+          return;
+        }
+
+        const point = getPos(event);
+        if (!this.lastPos) {
+          this.lastPos = point;
+        }
+
+        if (this.lastPos && dist(point, this.lastPos) > 2) {
+          this.trail.push({ x: point.x, y: point.y, life: 1 });
+          this.lastPos = point;
+          if (this.trail.length > this.maxTrail) {
+            this.trail.shift();
+          }
+
+          if (Math.random() < 0.3) {
+            const angle = Math.random() * Math.PI * 2;
+            const speedAdjust = this.scale / 1.5;
+            this.sparks.push({
+              x: point.x + Math.cos(angle) * 10 * this.scale,
+              y: point.y + Math.sin(angle) * 10 * this.scale,
+              vx: Math.cos(angle) * 1.3 * speedAdjust,
+              vy: Math.sin(angle) * 1.3 * speedAdjust,
+              rot: Math.random() * Math.PI * 2,
+              rs: 0.16,
+              s: 9 * this.scale,
+              a: 0.7,
+              whiteBoost: 0,
+              f: 0.95,
+            });
+          }
+        }
+      });
+
+      window.addEventListener("mouseup", () => {
+        this.isDown = false;
+      });
+
+      window.addEventListener("blur", () => {
+        this.isDown = false;
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          this.isDown = false;
+        }
+      });
+    }
+
+    boom(x, y) {
+      let wave;
+      if (this.wavePool.length > 0) {
+        wave = this.wavePool.pop();
+        wave.x = x;
+        wave.y = y;
+        wave.life = 0;
+        wave.max = 18;
+        wave.r = 0;
+        wave.ring.ang = Math.random() * Math.PI * 2;
+        wave.ring.life = 0;
+      } else {
+        wave = {
+          x,
+          y,
+          life: 0,
+          max: 18,
+          r: 0,
+          ring: {
+            ang: Math.random() * Math.PI * 2,
+            segs: [
+              { off: -0.25 * Math.PI, len: 1.15 * Math.PI },
+              { off: 0.0 * Math.PI, len: 1.15 * Math.PI },
+              { off: 0.25 * Math.PI, len: 1.15 * Math.PI },
+            ],
+            life: 0,
+            maxLife: 30,
+            rs: 0.08,
+          },
+        };
+      }
+      this.waves.push(wave);
+
+      const particleCount = 5;
+      const speedAdjust = this.scale / 1.5;
+      for (let i = 0; i < particleCount; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (4.8 + Math.random() * 2) * speedAdjust;
+
+        let spark;
+        if (this.sparkPool.length > 0) {
+          spark = this.sparkPool.pop();
+          spark.x = x;
+          spark.y = y;
+          spark.vx = Math.cos(angle) * speed;
+          spark.vy = Math.sin(angle) * speed;
+          spark.rot = Math.random() * Math.PI * 2;
+          spark.rs = (Math.random() - 0.5) * 0.28;
+          spark.s = (4 + Math.random() * 3) * this.scale;
+          spark.a = 1;
+          spark.whiteBoost = 0.1;
+          spark.f = 0.9;
+        } else {
+          spark = {
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            rot: Math.random() * Math.PI * 2,
+            rs: (Math.random() - 0.5) * 0.28,
+            s: (4 + Math.random() * 3) * this.scale,
+            a: 1,
+            whiteBoost: 0.1,
+            f: 0.9,
+          };
+        }
+        this.sparks.push(spark);
+      }
+    }
+
+    loop(now) {
+      if (!this.ctx) {
+        return;
+      }
+
+      const deltaMs = Math.min(now - this.lastFrameTime, this.maxDeltaMs);
+      this.lastFrameTime = now;
+      const frameScale = (deltaMs / this.baseFrameMs) * this.speed;
+
+      if (this.waves.length > 0 || this.sparks.length > 0 || this.trail.length > 0) {
+        this.ctx.clearRect(0, 0, this.c.width, this.c.height);
+        this.ctx.globalCompositeOperation = "lighter";
+
+        for (let i = this.trail.length - 1; i >= 0; i -= 1) {
+          const node = this.trail[i];
+          if (window.enableAlwaysTrailEffect) {
+            node.life -= 0.085 * frameScale;
+          } else {
+            node.life -= (this.isDown ? 0.085 : 0.18) * frameScale;
+          }
+          if (node.life <= 0) {
+            this.trail.splice(i, 1);
+          }
+        }
+
+        if (this.trail.length > 1) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(this.trail[0].x, this.trail[0].y);
+          for (let i = 1; i < this.trail.length; i += 1) {
+            this.ctx.lineTo(this.trail[i].x, this.trail[i].y);
+          }
+          this.ctx.lineWidth = 5.0;
+
+          const meteorHead = this.trail[this.trail.length - 1];
+          const meteorTail = this.trail[0];
+          const gradient = this.ctx.createLinearGradient(
+            meteorHead.x,
+            meteorHead.y,
+            meteorTail.x,
+            meteorTail.y,
+          );
+          const trailColor = "255,255,255";
+          gradient.addColorStop(0, `rgba(${trailColor}, 0.95)`);
+          gradient.addColorStop(1, `rgba(${trailColor}, 0)`);
+
+          this.ctx.shadowColor = `rgba(${trailColor}, 0.7)`;
+          this.ctx.shadowBlur = 3;
+          this.ctx.shadowOffsetX = 0;
+          this.ctx.shadowOffsetY = 0;
+
+          this.ctx.strokeStyle = gradient;
+          this.ctx.stroke();
+          this.ctx.shadowColor = "transparent";
+        }
+
+        for (let i = this.waves.length - 1; i >= 0; i -= 1) {
+          const wave = this.waves[i];
+          wave.life += frameScale;
+          const progress = wave.life / wave.max;
+          const ease = 1 - Math.pow(1 - Math.min(progress, 1), 3);
+          wave.r = 26 * this.scale * ease;
+          const alpha = Math.max(0, 1 - progress);
+
+          if (alpha > 0) {
+            this.ctx.beginPath();
+            this.ctx.arc(wave.x, wave.y, wave.r, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(${this.coreColor},${this.alpha(alpha)})`;
+            this.ctx.fill();
+          }
+
+          const ring = wave.ring;
+          ring.life += frameScale;
+          const ringProgress = Math.min(ring.life / ring.maxLife, 1);
+          const ringAlpha = Math.max(0, 1 - ringProgress * 0.75);
+          ring.ang -= ring.rs * frameScale;
+          ring.segs.forEach((segment) => {
+            const shrink = Math.max(0, 1 - ringProgress);
+            const length = segment.len * shrink;
+            const start = ring.ang + segment.off;
+            this.ctx.beginPath();
+            this.ctx.arc(wave.x, wave.y, wave.r + 4 * this.scale, start, start + length);
+            this.ctx.lineWidth = 4.8;
+            this.ctx.shadowColor = `rgba(255,255,255,${this.alpha(0.7 * ringAlpha)})`;
+            this.ctx.shadowBlur = 10;
+            this.ctx.strokeStyle = `rgba(255,255,255,${this.alpha(ringAlpha)})`;
+            this.ctx.stroke();
+            this.ctx.shadowColor = "transparent";
+            this.ctx.shadowBlur = 0;
+          });
+
+          if (progress >= 1 && ringProgress >= 1) {
+            this.wavePool.push(this.waves[i]);
+            this.waves.splice(i, 1);
+          }
+        }
+
+        for (let i = this.sparks.length - 1; i >= 0; i -= 1) {
+          const spark = this.sparks[i];
+          spark.x += spark.vx * frameScale;
+          spark.y += spark.vy * frameScale;
+          spark.vx *= Math.pow(spark.f, frameScale);
+          spark.vy *= Math.pow(spark.f, frameScale);
+          spark.rot += spark.rs * frameScale;
+          spark.a -= 0.032 * frameScale;
+          if (spark.a <= 0) {
+            this.sparkPool.push(this.sparks[i]);
+            this.sparks.splice(i, 1);
+            continue;
+          }
+
+          this.ctx.save();
+          this.ctx.translate(spark.x, spark.y);
+          this.ctx.rotate(spark.rot);
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, -spark.s);
+          this.ctx.lineTo(spark.s * 0.6, spark.s * 0.6);
+          this.ctx.lineTo(-spark.s * 0.6, spark.s * 0.6);
+          this.ctx.fillStyle = `rgba(255,255,255,${this.alpha(Math.min(1, spark.a + (spark.whiteBoost || 0)))})`;
+          this.ctx.fill();
+          this.ctx.restore();
+        }
+
+        this.ctx.globalCompositeOperation = "source-over";
+      }
+
+      requestAnimationFrame((nextNow) => this.loop(nextNow));
+    }
+  }
+
+  globalWindow.spark = new MouseSpark(canvas, config);
+
+  let lastBoomX = -1;
+  let lastBoomY = -1;
+  let lastBoomTime = 0;
+  let lastMoveX = -1;
+  let lastMoveY = -1;
+
+  window.enableAlwaysTrailEffect = !!config.alwaysTrail;
+
+  window.externalBoom = (x, y) => {
+    const now = Date.now();
+    if (x === lastBoomX && y === lastBoomY && now - lastBoomTime < 25) {
+      return;
+    }
+    lastBoomX = x;
+    lastBoomY = y;
+    lastBoomTime = now;
+    window.dispatchEvent(new MouseEvent("mousedown", { clientX: x, clientY: y, bubbles: true }));
+  };
+
+  window.externalMove = (x, y) => {
+    if (x === lastMoveX && y === lastMoveY) {
+      return;
+    }
+    lastMoveX = x;
+    lastMoveY = y;
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y, bubbles: true }));
+  };
+
+  window.externalUp = () => {
+    window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  };
+
+  window.updateColor = (rgbString) => {
+    if (window.spark) {
+      window.spark.color = rgbString;
+
+      const [r, g, b] = rgbString.split(",").map((part) =>
+        Math.max(0, Math.min(255, Number(part.trim()) || 0)),
+      );
+      const lighten = (channel) => Math.round(channel + (255 - channel) * 0.18);
+      window.spark.coreColor = `${lighten(r)},${lighten(g)},${lighten(b)}`;
+    }
+  };
+
+  window.updateEffectSettings = (scale, opacity, speed) => {
+    if (!window.spark) {
+      return;
+    }
+    window.spark.scale = Math.max(0.5, Math.min(3, Number(scale) || 1.5));
+    window.spark.opacity = Math.max(0.1, Math.min(1, Number(opacity) || 1.0));
+    window.spark.speed = Math.max(0.2, Math.min(3, Number(speed) || 1.0));
+  };
+
+  globalWindow.__fuwariMouseSparkInstance = globalWindow.spark;
+})();
+</script>
+
+<style is:global>
+.fuwari-mouse-spark-canvas {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 999;
+}
+</style>

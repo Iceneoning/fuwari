@@ -1,6 +1,6 @@
 ---
 import { getEntry, render } from "astro:content";
-import Markdown from "@components/misc/Markdown.astro";
+import { Icon } from "astro-icon/components";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
 
 const friendsPost = await getEntry("spec", "friends");
@@ -10,14 +10,191 @@ if (!friendsPost) {
 }
 
 const { Content } = await render(friendsPost);
+const friends = friendsPost.data.friends ?? [];
+
+function getDomain(rawUrl: string) {
+	try {
+		return new URL(rawUrl).hostname.replace(/^www\./, "");
+	} catch {
+		return rawUrl;
+	}
+}
 ---
 
 <MainGridLayout title="友之屋" description="友情链接">
-	<div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
-		<div class="card-base z-10 px-9 py-6 relative w-full">
-			<Markdown class="mt-2">
-				<Content />
-			</Markdown>
+	<section class="friends-shell card-base relative overflow-hidden px-5 py-6 sm:px-8 sm:py-8">
+		<div class="friends-orb friends-orb-one" aria-hidden="true"></div>
+		<div class="friends-orb friends-orb-two" aria-hidden="true"></div>
+
+		<header class="relative z-10 flex flex-col gap-5 border-b border-black/[0.07] pb-7 dark:border-white/[0.09] sm:flex-row sm:items-end sm:justify-between">
+			<div class="min-w-0">
+				<div class="mb-3 inline-flex items-center gap-2 rounded-full bg-[var(--primary)]/10 px-3 py-1.5 text-xs font-bold tracking-[0.16em] text-[var(--primary)]">
+					<Icon name="material-symbols:diversity-3-rounded" class="text-base" />
+					FRIEND LINKS
+				</div>
+				<div class="friends-intro prose dark:prose-invert prose-base !max-w-2xl [&_.anchor]:hidden [&_h1]:!mb-2 [&_h1]:!text-3xl sm:[&_h1]:!text-4xl [&_p]:!mb-0 [&_p]:!text-sm [&_p]:!leading-7 [&_p]:!text-black/55 dark:[&_p]:!text-white/55">
+					<Content />
+				</div>
+			</div>
+			<div class="friend-count shrink-0 self-start sm:self-auto">
+				<strong>{String(friends.length).padStart(2, "0")}</strong>
+				<span>位同行者</span>
+			</div>
+		</header>
+
+		<div class="relative z-10 mt-7">
+			{
+				friends.length > 0 && (
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+						{friends.map((friend, index) => (
+							<a
+								href={friend.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="friend-card group relative flex min-h-44 flex-col overflow-hidden rounded-[var(--radius-large)] border border-black/[0.07] bg-white/50 p-5 no-underline shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[var(--primary)]/35 hover:shadow-xl dark:border-white/[0.08] dark:bg-white/[0.035]"
+								style={`--friend-hue: ${205 + index * 38}`}
+								aria-label={`访问 ${friend.name}（新窗口打开）`}
+							>
+								<div class="friend-card-glow" aria-hidden="true"></div>
+								<div class="relative z-10 flex items-start justify-between gap-4">
+									<div class="friend-avatar-ring">
+										<img
+											src={friend.avatar}
+											alt={`${friend.name} 的头像`}
+											class="friend-avatar"
+											width="72"
+											height="72"
+											loading="lazy"
+											decoding="async"
+										/>
+									</div>
+									<span class="grid h-9 w-9 place-items-center rounded-full bg-black/[0.045] text-black/40 transition-all duration-300 group-hover:rotate-6 group-hover:bg-[var(--primary)] group-hover:text-white dark:bg-white/[0.07] dark:text-white/45">
+										<Icon name="material-symbols:arrow-outward-rounded" class="text-lg" />
+									</span>
+								</div>
+								<div class="relative z-10 mt-5">
+									<h2 class="m-0 text-xl font-bold text-black/85 transition group-hover:text-[var(--primary)] dark:text-white/90">{friend.name}</h2>
+									<div class="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-black/35 dark:text-white/35">
+										<Icon name="material-symbols:language" class="text-sm" />
+										<span class="truncate">{getDomain(friend.url)}</span>
+									</div>
+									{friend.description && <p class="mb-0 mt-3 text-sm leading-6 text-black/60 dark:text-white/60">{friend.description}</p>}
+								</div>
+							</a>
+						))}
+					</div>
+				)
+			}
 		</div>
-	</div>
+	</section>
 </MainGridLayout>
+
+<style>
+	.friends-shell {
+		isolation: isolate;
+		border: 1px solid rgb(255 255 255 / 0.2);
+	}
+
+	.friends-orb {
+		position: absolute;
+		z-index: -1;
+		border-radius: 9999px;
+		filter: blur(2px);
+		pointer-events: none;
+	}
+
+	.friends-orb-one {
+		top: -8rem;
+		right: -6rem;
+		width: 20rem;
+		height: 20rem;
+		background: color-mix(in oklch, var(--primary) 16%, transparent);
+	}
+
+	.friends-orb-two {
+		bottom: -10rem;
+		left: 18%;
+		width: 22rem;
+		height: 16rem;
+		background: color-mix(in oklch, oklch(0.78 0.1 190) 12%, transparent);
+	}
+
+	.friend-count {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		padding: 0.65rem 0.9rem;
+		border-radius: 0.85rem;
+		background: rgb(255 255 255 / 0.45);
+		box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.05);
+	}
+
+	:global(.dark) .friend-count {
+		background: rgb(255 255 255 / 0.05);
+		box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+	}
+
+	.friend-count strong {
+		font-size: 1.35rem;
+		line-height: 1;
+		color: var(--primary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.friend-count span {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: rgb(0 0 0 / 0.45);
+	}
+
+	:global(.dark) .friend-count span {
+		color: rgb(255 255 255 / 0.45);
+	}
+
+	.friend-card-glow {
+		position: absolute;
+		top: -5rem;
+		left: -5rem;
+		width: 10rem;
+		height: 10rem;
+		border-radius: 9999px;
+		background: oklch(0.82 0.1 var(--friend-hue) / 0.22);
+		transition: transform 400ms ease, opacity 400ms ease;
+	}
+
+	.friend-card:hover .friend-card-glow {
+		transform: scale(1.35);
+		opacity: 0.9;
+	}
+
+	.friend-avatar-ring {
+		display: grid;
+		width: 4.5rem;
+		height: 4.5rem;
+		place-items: center;
+		border: 2px solid rgb(255 255 255 / 0.72);
+		border-radius: 9999px;
+		background: linear-gradient(145deg, oklch(0.9 0.075 var(--friend-hue) / 0.9), oklch(0.72 0.13 var(--friend-hue) / 0.86));
+		box-shadow: 0 0.65rem 1.4rem oklch(0.55 0.08 var(--friend-hue) / 0.18);
+	}
+
+	.friend-avatar {
+		display: block;
+		width: calc(100% - 0.3rem);
+		height: calc(100% - 0.3rem);
+		border-radius: 9999px;
+		object-fit: cover;
+		object-position: center;
+	}
+
+	:global(.dark) .friend-avatar-ring {
+		border-color: rgb(255 255 255 / 0.42);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.friend-card,
+		.friend-card-glow {
+			transition: none;
+		}
+	}
+</style>

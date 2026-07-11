@@ -1,14 +1,235 @@
 ---
-import ArchivePanel from "@components/ArchivePanel.svelte";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getSortedPostsList } from "../utils/content-utils";
+import { getPostUrlBySlug } from "../utils/url-utils";
 
-const sortedPostsList = await getSortedPostsList();
+const allPosts = await getSortedPostsList();
+
+const grouped: Record<number, typeof allPosts> = {};
+for (const post of allPosts) {
+	const year = new Date(post.data.published).getFullYear();
+	if (!grouped[year]) grouped[year] = [];
+	grouped[year].push(post);
+}
+const groups = Object.entries(grouped)
+	.map(([year, posts]) => ({ year: Number(year), posts }))
+	.sort((a, b) => b.year - a.year);
+
+function formatDate(date: Date) {
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${month}-${day}`;
+}
+function formatDateFull(date: Date) {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${year}.${month}.${day}`;
+}
+function formatTag(tagList: string[]) {
+	return tagList.map((t) => `#${t}`).join(" ");
+}
 ---
 
 <MainGridLayout title={i18n(I18nKey.archive)}>
-    <ArchivePanel sortedPosts={sortedPostsList} client:only="svelte"></ArchivePanel>
+	<!-- Timeline view (all posts) -->
+	<div id="archive-timeline" class="card-base px-4 py-6 sm:px-8">
+		{
+			groups.map((group) => (
+				<div>
+					<div class="flex flex-row w-full items-center h-[3.75rem]">
+						<div class="w-[15%] md:w-[10%] transition text-2xl font-bold text-right text-75">{group.year}</div>
+						<div class="w-[15%] md:w-[10%]">
+							<div class="h-3 w-3 bg-none rounded-full outline outline-[var(--primary)] mx-auto -outline-offset-[2px] z-50 outline-3"></div>
+						</div>
+						<div class="w-[70%] md:w-[80%] transition text-left text-50">
+							{group.posts.length} {i18n(group.posts.length === 1 ? I18nKey.postCount : I18nKey.postsCount)}
+						</div>
+					</div>
+					{group.posts.map((post) => (
+						<a href={getPostUrlBySlug(post.slug)} aria-label={post.data.title} class="group btn-plain !block h-10 w-full rounded-lg hover:text-[initial]">
+							<div class="flex flex-row justify-start items-center h-full">
+								<div class="w-[15%] md:w-[10%] transition text-sm text-right text-50">{formatDate(new Date(post.data.published))}</div>
+								<div class="w-[15%] md:w-[10%] relative dash-line h-full flex items-center">
+									<div class="transition-all mx-auto w-1 h-1 rounded group-hover:h-5 bg-[oklch(0.5_calc(0.05*var(--theme-chroma-scale))_var(--hue))] group-hover:bg-[var(--primary)] outline outline-4 z-50 outline-[var(--card-bg)] group-hover:outline-[var(--btn-plain-bg-hover)] group-active:outline-[var(--btn-plain-bg-active)]"></div>
+								</div>
+								<div class="w-[70%] md:max-w-[65%] md:w-[65%] text-left font-bold group-hover:translate-x-1 transition-all group-hover:text-[var(--primary)] text-75 pr-8 whitespace-nowrap overflow-ellipsis overflow-hidden">{post.data.title}</div>
+								<div class="hidden md:block md:w-[15%] text-left text-sm transition whitespace-nowrap overflow-ellipsis overflow-hidden text-30">{formatTag(post.data.tags)}</div>
+							</div>
+						</a>
+					))}
+				</div>
+			))
+		}
+	</div>
+
+	<!-- Query-based filters are applied in the browser so they also work on a statically built site. -->
+	<section id="archive-filter-view" class="hidden" aria-live="polite">
+		<header class="archive-filter-header card-base relative mb-4 overflow-hidden px-5 py-5 sm:px-7">
+			<div class="filter-glow" aria-hidden="true"></div>
+			<div class="relative z-10 flex items-end justify-between gap-4">
+				<div>
+					<div class="mb-2 text-xs font-bold tracking-[0.16em] text-[var(--primary)]">CURATED POSTS</div>
+					<h1 data-filter-title class="m-0 text-2xl font-bold text-black/85 dark:text-white/90">精选文章</h1>
+					<p data-filter-description class="mb-0 mt-2 text-sm text-black/50 dark:text-white/50">按内容类型精确筛选</p>
+				</div>
+				<div class="filter-count shrink-0"><strong data-filter-count>0</strong><span>篇</span></div>
+			</div>
+		</header>
+
+		<div id="archive-cards" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			{allPosts.map((post) => (
+				<a
+					href={getPostUrlBySlug(post.slug)}
+					data-tags={JSON.stringify(post.data.tags)}
+					data-category={post.data.category ?? ""}
+					class="archive-card-item card-base group relative min-h-44 overflow-hidden border border-white/20 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+				>
+					<div class="card-accent" aria-hidden="true"></div>
+					<div class="relative z-10 flex items-center justify-between gap-3">
+						<span class="rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-[0.68rem] font-bold text-[var(--primary)]">{post.data.category ?? "代码"}</span>
+						<time class="text-xs font-semibold tracking-wide text-black/35 dark:text-white/35">{formatDateFull(new Date(post.data.published))}</time>
+					</div>
+					<h2 class="relative z-10 mb-2 mt-4 line-clamp-2 text-lg font-bold text-black/80 transition group-hover:text-[var(--primary)] dark:text-white/85">
+						{post.data.title}
+					</h2>
+					{post.data.description && (
+						<p class="relative z-10 mb-0 line-clamp-2 text-sm leading-6 text-black/50 dark:text-white/50">{post.data.description}</p>
+					)}
+					<div class="relative z-10 mt-4 truncate text-xs text-black/30 dark:text-white/30">{formatTag(post.data.tags)}</div>
+				</a>
+			))}
+		</div>
+
+		<div id="archive-empty" class="card-base hidden px-6 py-12 text-center">
+			<div class="text-4xl" aria-hidden="true">✦</div>
+			<h2 class="mb-1 mt-3 text-lg font-bold text-black/70 dark:text-white/75">这里还没有文章</h2>
+			<p class="m-0 text-sm text-black/45 dark:text-white/45">换一个分类看看，或稍后再来。</p>
+		</div>
+	</section>
 </MainGridLayout>
 
+<script>
+function applyArchiveFilters() {
+	const params = new URLSearchParams(window.location.search);
+	const tagFilter = params.getAll("tag");
+	const categoryFilter = params.getAll("category");
+	const uncategorized = params.get("uncategorized");
+	const isFiltered = tagFilter.length > 0 || categoryFilter.length > 0 || uncategorized !== null;
+
+	const timeline = document.getElementById("archive-timeline");
+	const filterView = document.getElementById("archive-filter-view");
+	if (!timeline || !filterView) return;
+
+	timeline.classList.toggle("hidden", isFiltered);
+	filterView.classList.toggle("hidden", !isFiltered);
+	if (!isFiltered) return;
+
+	const labels: Record<string, { title: string; description: string }> = {
+		杂谈: { title: "杂谈", description: "生活见闻、兴趣经历与随想" },
+		代码: { title: "代码", description: "编程学习、技术实践与创作记录" },
+	};
+	const currentLabel = categoryFilter.length === 1 ? labels[categoryFilter[0]] : null;
+	const filterTitle = filterView.querySelector<HTMLElement>("[data-filter-title]");
+	const filterDescription = filterView.querySelector<HTMLElement>("[data-filter-description]");
+	if (filterTitle) filterTitle.textContent = currentLabel?.title ?? tagFilter[0] ?? categoryFilter[0] ?? "精选文章";
+	if (filterDescription) filterDescription.textContent = currentLabel?.description ?? "按文章元数据精确筛选";
+
+	let visibleCount = 0;
+	const cards = filterView.querySelectorAll<HTMLElement>(".archive-card-item");
+	for (const card of cards) {
+		const tags: string[] = JSON.parse(card.dataset.tags || "[]");
+		const category = card.dataset.category || "";
+		let matches = true;
+		if (matches && tagFilter.length > 0) matches = tagFilter.some((tag) => tags.includes(tag));
+		if (matches && categoryFilter.length > 0) matches = categoryFilter.includes(category);
+		if (matches && uncategorized !== null) matches = !category;
+		card.classList.toggle("hidden", !matches);
+		if (matches) visibleCount += 1;
+	}
+
+	const count = filterView.querySelector<HTMLElement>("[data-filter-count]");
+	if (count) count.textContent = String(visibleCount).padStart(2, "0");
+	document.getElementById("archive-empty")?.classList.toggle("hidden", visibleCount > 0);
+}
+
+applyArchiveFilters();
+
+const archiveWindow = window as Window & { __archiveFilterHookAdded?: boolean };
+if (!archiveWindow.__archiveFilterHookAdded && window.swup?.hooks) {
+	window.swup.hooks.on("page:view", applyArchiveFilters);
+	archiveWindow.__archiveFilterHookAdded = true;
+}
+</script>
+
+<style>
+	.archive-filter-header {
+		isolation: isolate;
+		border: 1px solid rgb(255 255 255 / 0.24);
+	}
+
+	.filter-glow {
+		position: absolute;
+		top: -7rem;
+		right: -3rem;
+		width: 16rem;
+		height: 16rem;
+		border-radius: 9999px;
+		background: color-mix(in oklch, var(--primary) 18%, transparent);
+	}
+
+	.filter-count {
+		display: flex;
+		align-items: baseline;
+		gap: 0.25rem;
+		padding: 0.65rem 0.8rem;
+		border-radius: 0.85rem;
+		background: rgb(255 255 255 / 0.45);
+		box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.05);
+	}
+
+	:global(.dark) .filter-count {
+		background: rgb(255 255 255 / 0.05);
+		box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+	}
+
+	.filter-count strong {
+		color: var(--primary);
+		font-size: 1.35rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.filter-count span {
+		color: rgb(0 0 0 / 0.4);
+		font-size: 0.75rem;
+		font-weight: 700;
+	}
+
+	:global(.dark) .filter-count span {
+		color: rgb(255 255 255 / 0.4);
+	}
+
+	.card-accent {
+		position: absolute;
+		top: -5rem;
+		right: -5rem;
+		width: 10rem;
+		height: 10rem;
+		border-radius: 9999px;
+		background: color-mix(in oklch, var(--primary) 10%, transparent);
+		transition: transform 350ms ease;
+	}
+
+	.archive-card-item:hover .card-accent {
+		transform: scale(1.35);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.archive-card-item,
+		.card-accent {
+			transition: none;
+		}
+	}
+</style>

@@ -12,6 +12,10 @@ let result: SearchResult[] = [];
 let isSearching = false;
 let pagefindLoaded = false;
 let initialized = false;
+let desktopSearchTimer: ReturnType<typeof setTimeout> | undefined;
+let mobileSearchTimer: ReturnType<typeof setTimeout> | undefined;
+let desktopRequestId = 0;
+let mobileRequestId = 0;
 
 const fakeResult: SearchResult[] = [
 	{
@@ -33,6 +37,13 @@ const fakeResult: SearchResult[] = [
 const togglePanel = () => {
 	const panel = document.getElementById("search-panel");
 	panel?.classList.toggle("float-panel-closed");
+	requestPagefind();
+};
+
+const requestPagefind = () => {
+	if (import.meta.env.PROD && !pagefindLoaded) {
+		document.dispatchEvent(new CustomEvent("pagefind:request"));
+	}
 };
 
 const setPanelVisibility = (show: boolean, isDesktop: boolean): void => {
@@ -47,13 +58,19 @@ const setPanelVisibility = (show: boolean, isDesktop: boolean): void => {
 };
 
 const search = async (keyword: string, isDesktop: boolean): Promise<void> => {
+	const requestId = isDesktop ? ++desktopRequestId : ++mobileRequestId;
 	if (!keyword) {
 		setPanelVisibility(false, isDesktop);
 		result = [];
+		isSearching = false;
 		return;
 	}
 
 	if (!initialized) {
+		return;
+	}
+	if (import.meta.env.PROD && !pagefindLoaded) {
+		requestPagefind();
 		return;
 	}
 
@@ -74,15 +91,32 @@ const search = async (keyword: string, isDesktop: boolean): Promise<void> => {
 			console.error("Pagefind is not available in production environment.");
 		}
 
-		result = searchResults;
+		const isLatestRequest = isDesktop
+			? requestId === desktopRequestId
+			: requestId === mobileRequestId;
+		if (!isLatestRequest) return;
+
+		result = searchResults.slice(0, 12);
 		setPanelVisibility(result.length > 0, isDesktop);
 	} catch (error) {
 		console.error("Search error:", error);
 		result = [];
 		setPanelVisibility(false, isDesktop);
 	} finally {
-		isSearching = false;
+		const isLatestRequest = isDesktop
+			? requestId === desktopRequestId
+			: requestId === mobileRequestId;
+		if (isLatestRequest) isSearching = false;
 	}
+};
+
+const scheduleSearch = (keyword: string, isDesktop: boolean) => {
+	const existingTimer = isDesktop ? desktopSearchTimer : mobileSearchTimer;
+	if (existingTimer) clearTimeout(existingTimer);
+
+	const timer = setTimeout(() => search(keyword.trim(), isDesktop), 120);
+	if (isDesktop) desktopSearchTimer = timer;
+	else mobileSearchTimer = timer;
 };
 
 onMount(() => {
@@ -92,48 +126,36 @@ onMount(() => {
 			typeof window !== "undefined" &&
 			!!window.pagefind &&
 			typeof window.pagefind.search === "function";
-		console.log("Pagefind status on init:", pagefindLoaded);
 		if (keywordDesktop) search(keywordDesktop, true);
 		if (keywordMobile) search(keywordMobile, false);
 	};
+	const handlePagefindReady = () => initializeSearch();
+	const handlePagefindError = () => {
+		pagefindLoaded = false;
+	};
 
 	if (import.meta.env.DEV) {
-		console.log(
-			"Pagefind is not available in development mode. Using mock data.",
-		);
 		initializeSearch();
 	} else {
-		document.addEventListener("pagefindready", () => {
-			console.log("Pagefind ready event received.");
-			initializeSearch();
-		});
-		document.addEventListener("pagefindloaderror", () => {
-			console.warn(
-				"Pagefind load error event received. Search functionality will be limited.",
-			);
-			initializeSearch(); // Initialize with pagefindLoaded as false
-		});
-
-		// Fallback in case events are not caught or pagefind is already loaded by the time this script runs
-		setTimeout(() => {
-			if (!initialized) {
-				console.log("Fallback: Initializing search after timeout.");
-				initializeSearch();
-			}
-		}, 2000); // Adjust timeout as needed
+		document.addEventListener("pagefindready", handlePagefindReady);
+		document.addEventListener("pagefindloaderror", handlePagefindError);
+		initializeSearch();
 	}
+
+	return () => {
+		document.removeEventListener("pagefindready", handlePagefindReady);
+		document.removeEventListener("pagefindloaderror", handlePagefindError);
+		if (desktopSearchTimer) clearTimeout(desktopSearchTimer);
+		if (mobileSearchTimer) clearTimeout(mobileSearchTimer);
+	};
 });
 
-$: if (initialized && keywordDesktop) {
-	(async () => {
-		await search(keywordDesktop, true);
-	})();
+$: if (initialized) {
+	scheduleSearch(keywordDesktop, true);
 }
 
-$: if (initialized && keywordMobile) {
-	(async () => {
-		await search(keywordMobile, false);
-	})();
+$: if (initialized) {
+	scheduleSearch(keywordMobile, false);
 }
 </script>
 
@@ -143,7 +165,7 @@ $: if (initialized && keywordMobile) {
       dark:bg-white/5 dark:hover:bg-white/10 dark:focus-within:bg-white/10
 ">
     <Icon icon="material-symbols:search" class="absolute text-[1.25rem] pointer-events-none ml-3 transition my-auto text-black/30 dark:text-white/30"></Icon>
-    <input placeholder="{i18n(I18nKey.search)}" bind:value={keywordDesktop} on:focus={() => search(keywordDesktop, true)}
+    <input placeholder="{i18n(I18nKey.search)}" bind:value={keywordDesktop} on:focus={requestPagefind}
            class="transition-all pl-10 text-sm bg-transparent outline-0
          h-full w-40 active:w-60 focus:w-60 text-black/50 dark:text-white/50"
     >
@@ -165,7 +187,7 @@ top-20 left-4 md:left-[unset] right-4 shadow-2xl rounded-2xl p-2">
       dark:bg-white/5 dark:hover:bg-white/10 dark:focus-within:bg-white/10
   ">
         <Icon icon="material-symbols:search" class="absolute text-[1.25rem] pointer-events-none ml-3 transition my-auto text-black/30 dark:text-white/30"></Icon>
-		 <input placeholder={i18n(I18nKey.search)} bind:value={keywordMobile}
+		 <input placeholder={i18n(I18nKey.search)} bind:value={keywordMobile} on:focus={requestPagefind}
                class="pl-10 absolute inset-0 text-sm bg-transparent outline-0
                focus:w-60 text-black/50 dark:text-white/50"
         >
