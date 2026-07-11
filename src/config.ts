@@ -16,7 +16,7 @@ export const siteConfig: SiteConfig = {
 	},
 	banner: {
 		enable: false,
-		src: "assets/images/demo-banner.png", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
+		src: "assets/images/demo-banner.webp", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
 		position: "center", // Equivalent to object-position, only supports 'top', 'center', 'bottom'. 'center' by default
 		credit: {
 			enable: false, // Display the credit text of the banner image
@@ -40,7 +40,7 @@ export const siteConfig: SiteConfig = {
 
 export const backgroundConfig = {
 	enable: true,
-	src: "/background/site-bg.png", // Path relative to /public when it starts with '/'
+	src: "/background/site-bg.webp", // Path relative to /public when it starts with '/'
 	blur: 0, // Blur radius in px for frosted effect
 	overlayLight: 0.42, // Light mode overlay opacity
 	overlayDark: 0.5, // Dark mode overlay opacity
@@ -62,12 +62,12 @@ export const navBarConfig: NavBarConfig = {
 			url: "/archive/",
 		},
 		{
-			name: "游戏",
-			url: "/archive/?tag=游戏",
+			name: "杂谈",
+			url: "/archive/?category=杂谈",
 		},
 		{
 			name: "代码",
-			url: "/archive/?tag=代码",
+			url: "/archive/?category=代码",
 		},
 		{
 			name: "友之屋",
@@ -77,7 +77,7 @@ export const navBarConfig: NavBarConfig = {
 };
 
 export const profileConfig: ProfileConfig = {
-	avatar: "assets/images/demo-avatar.png", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
+	avatar: "assets/images/demo-avatar.webp", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
 	name: "冰霓Iceneon",
 	bio: "你好啊，很高心认识你。",
 	links: [

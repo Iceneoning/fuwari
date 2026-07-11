@@ -1,25 +1,16 @@
+---
+friends:
+  - name: 社亦园
+    url: https://blog.sheyiyuan.com/
+    description: 记录前端、设计和生活片段。
+  - name: 吟风
+    url: https://www.windchant.online/
+    description: 后端开发
+  - name: MOi
+    url: https://hagumiaoi.pages.dev/
+    description: AI生图之路
+---
+
 # 友之屋
 
-这里是友情链接页面，下面先放一组示例友链。
-
-> 以后你只需要在这个文件里继续追加列表项就可以了。
-
-## 示例友链
-
-- [星屑小站](https://example.com)  
-  记录前端、设计和生活片段。
-
-- [夜航日志](https://example.org)  
-  偏技术向的开发与部署笔记。
-
-- [像素旅社](https://example.net)  
-  游戏截图、MOD 折腾和测评。
-
-## 友链格式模板
-
-复制下面模板，改名字和链接即可：
-
-```md
-- [站点名称](https://你的链接)
-  一句话简介。
-```
+在互联网的风里相遇，也在彼此的小站里交换灵感。欢迎去这些有趣的角落坐坐。

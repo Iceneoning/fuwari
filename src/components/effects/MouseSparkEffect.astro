@@ -15,11 +15,12 @@
 
   const config = {
     color: "45,175,255",
+    coreColor: "92,200,255",
     scale: 1.5,
     opacity: 1.0,
     speed: 1.0,
     maxTrail: 16,
-    alwaysTrail: false,
+    alwaysTrail: true,
   };
 
   const canvasId = "fuwari-mouse-spark-canvas";
@@ -37,6 +38,7 @@
       this.c = targetCanvas;
       this.ctx = this.c.getContext("2d");
       this.color = opts.color || "45,175,255";
+      this.coreColor = opts.coreColor || "92,200,255";
       this.scale = opts.scale || 1.5;
       this.opacity = opts.opacity || 1.0;
       this.speed = opts.speed || 1.0;
@@ -117,6 +119,7 @@
               rs: 0.16,
               s: 9 * this.scale,
               a: 0.7,
+              whiteBoost: 0,
               f: 0.95,
             });
           }
@@ -171,7 +174,7 @@
       }
       this.waves.push(wave);
 
-      const particleCount = 4;
+      const particleCount = 5;
       const speedAdjust = this.scale / 1.5;
       for (let i = 0; i < particleCount; i += 1) {
         const angle = Math.random() * Math.PI * 2;
@@ -188,6 +191,7 @@
           spark.rs = (Math.random() - 0.5) * 0.28;
           spark.s = (4 + Math.random() * 3) * this.scale;
           spark.a = 1;
+          spark.whiteBoost = 0.1;
           spark.f = 0.9;
         } else {
           spark = {
@@ -199,6 +203,7 @@
             rs: (Math.random() - 0.5) * 0.28,
             s: (4 + Math.random() * 3) * this.scale,
             a: 1,
+            whiteBoost: 0.1,
             f: 0.9,
           };
         }
@@ -247,10 +252,11 @@
             meteorTail.x,
             meteorTail.y,
           );
-          gradient.addColorStop(0, `rgba(${this.color}, 1)`);
-          gradient.addColorStop(1, `rgba(${this.color}, 0)`);
+          const trailColor = "255,255,255";
+          gradient.addColorStop(0, `rgba(${trailColor}, 0.95)`);
+          gradient.addColorStop(1, `rgba(${trailColor}, 0)`);
 
-          this.ctx.shadowColor = `rgba(${this.color}, 0.6)`;
+          this.ctx.shadowColor = `rgba(${trailColor}, 0.7)`;
           this.ctx.shadowBlur = 3;
           this.ctx.shadowOffsetX = 0;
           this.ctx.shadowOffsetY = 0;
@@ -271,23 +277,28 @@
           if (alpha > 0) {
             this.ctx.beginPath();
             this.ctx.arc(wave.x, wave.y, wave.r, 0, Math.PI * 2);
-            this.ctx.fillStyle = `rgba(${this.color},${this.alpha(alpha)})`;
+            this.ctx.fillStyle = `rgba(${this.coreColor},${this.alpha(alpha)})`;
             this.ctx.fill();
           }
 
           const ring = wave.ring;
           ring.life += frameScale;
           const ringProgress = Math.min(ring.life / ring.maxLife, 1);
+          const ringAlpha = Math.max(0, 1 - ringProgress * 0.75);
           ring.ang -= ring.rs * frameScale;
           ring.segs.forEach((segment) => {
             const shrink = Math.max(0, 1 - ringProgress);
             const length = segment.len * shrink;
             const start = ring.ang + segment.off;
             this.ctx.beginPath();
-            this.ctx.arc(wave.x, wave.y, wave.r + 3 * this.scale, start, start + length);
-            this.ctx.lineWidth = 3.7;
-            this.ctx.strokeStyle = `rgba(245,248,252,${this.alpha(1 - ringProgress)})`;
+            this.ctx.arc(wave.x, wave.y, wave.r + 4 * this.scale, start, start + length);
+            this.ctx.lineWidth = 4.8;
+            this.ctx.shadowColor = `rgba(255,255,255,${this.alpha(0.7 * ringAlpha)})`;
+            this.ctx.shadowBlur = 10;
+            this.ctx.strokeStyle = `rgba(255,255,255,${this.alpha(ringAlpha)})`;
             this.ctx.stroke();
+            this.ctx.shadowColor = "transparent";
+            this.ctx.shadowBlur = 0;
           });
 
           if (progress >= 1 && ringProgress >= 1) {
@@ -317,7 +328,7 @@
           this.ctx.moveTo(0, -spark.s);
           this.ctx.lineTo(spark.s * 0.6, spark.s * 0.6);
           this.ctx.lineTo(-spark.s * 0.6, spark.s * 0.6);
-          this.ctx.fillStyle = `rgba(255,255,255,${this.alpha(spark.a)})`;
+          this.ctx.fillStyle = `rgba(255,255,255,${this.alpha(Math.min(1, spark.a + (spark.whiteBoost || 0)))})`;
           this.ctx.fill();
           this.ctx.restore();
         }
@@ -366,6 +377,12 @@
   window.updateColor = (rgbString) => {
     if (window.spark) {
       window.spark.color = rgbString;
+
+      const [r, g, b] = rgbString.split(",").map((part) =>
+        Math.max(0, Math.min(255, Number(part.trim()) || 0)),
+      );
+      const lighten = (channel) => Math.round(channel + (255 - channel) * 0.18);
+      window.spark.coreColor = `${lighten(r)},${lighten(g)},${lighten(b)}`;
     }
   };
 
