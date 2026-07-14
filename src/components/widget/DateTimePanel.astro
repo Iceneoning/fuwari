@@ -1,4 +1,6 @@
 ---
+import { existsSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Icon } from "astro-icon/components";
 
 const now = new Date();
@@ -9,6 +11,7 @@ const initialWeekday = now.toLocaleDateString("zh-CN", { weekday: "long" });
 const initialHour = String(now.getHours()).padStart(2, "0");
 const initialMinute = String(now.getMinutes()).padStart(2, "0");
 const initialSecond = String(now.getSeconds()).padStart(2, "0");
+const initialClock = `${initialHour}:${initialMinute}:${initialSecond}`;
 const initialGreeting =
 	now.getHours() < 6
 		? "夜深了"
@@ -17,9 +20,17 @@ const initialGreeting =
 			: now.getHours() < 18
 				? "下午好"
 				: "晚上好";
+const forecastDir = fileURLToPath(new URL("../../../public/DailyForecast/", import.meta.url));
+const forecastImages = existsSync(forecastDir)
+	? readdirSync(forecastDir, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && /\.(avif|gif|jpe?g|png|webp)$/i.test(entry.name))
+			.map((entry) => entry.name)
+			.sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true }))
+	: [];
+const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encodeURIComponent(image)}`);
 ---
 
-<date-time-panel class="date-panel card-base relative block overflow-hidden p-4" aria-label="当前日期与时间">
+<date-time-panel class="date-panel card-base relative block overflow-hidden p-4" data-forecast-pool={JSON.stringify(forecastImageUrls)} aria-label="当前日期与时间">
 	<div class="date-panel-glow" aria-hidden="true"></div>
 	<div class="relative z-10">
 		<div class="flex items-center justify-between">
@@ -45,35 +56,84 @@ const initialGreeting =
 		</div>
 
 		<div class="mt-4 flex items-end justify-between border-t border-black/[0.07] pt-3 dark:border-white/[0.08]">
-			<div class="flex items-center text-[2rem] font-extrabold leading-none tracking-[-0.05em] text-black/85 tabular-nums dark:text-white/90">
-				<span data-hour>{initialHour}</span><span class="time-colon">:</span><span data-minute>{initialMinute}</span>
+			<div class="flex min-w-0 flex-col">
+				<div data-clock class="clock-text flex items-center text-[1.72rem] font-extrabold leading-none text-black/85 tabular-nums dark:text-white/90">
+					{initialClock}
+				</div>
+				<div class="mt-1 text-[0.62rem] font-bold tracking-[0.12em] text-black/30 dark:text-white/30">时 · 分 · 秒</div>
 			</div>
-			<div class="mb-0.5 flex items-center gap-1 rounded-lg bg-black/[0.045] px-2 py-1 text-xs font-bold text-black/40 tabular-nums dark:bg-white/[0.06] dark:text-white/40">
-				<Icon name="material-symbols:timer-outline-rounded" class="text-sm" />
-				<span data-second>{initialSecond}</span>
+			<div class="mb-0.5 grid h-9 w-9 place-items-center rounded-lg bg-black/[0.045] text-[var(--primary)] dark:bg-white/[0.06]">
+				<Icon name="material-symbols:timer-outline-rounded" class="text-lg" />
+			</div>
+		</div>
+
+		<div data-fortune class="fortune-panel mt-4 border-t border-black/[0.07] pt-3 dark:border-white/[0.08]">
+			<div class="mb-2 flex items-center justify-between gap-2">
+				<div class="flex items-center gap-2 text-[0.68rem] font-bold tracking-[0.12em] text-black/40 dark:text-white/40">
+					<Icon name="material-symbols:auto-awesome-rounded" class="text-base text-[var(--primary)]" />
+					今日运势
+				</div>
+				<span data-fortune-badge class="fortune-badge">未揭晓</span>
+			</div>
+			<button data-fortune-button type="button" class="fortune-button">
+				<Icon name="material-symbols:flare-rounded" class="text-lg" />
+				<span>查看今日运势</span>
+			</button>
+			<div data-fortune-result class="fortune-result" hidden>
+				<div class="flex items-center justify-between gap-3">
+					<div data-fortune-title class="fortune-title text-xl font-extrabold leading-none text-black/80 dark:text-white/90">待开启</div>
+					<div data-fortune-stars class="fortune-stars" aria-label="今日运势星级">
+						<span>☆</span><span>☆</span><span>☆</span><span>☆</span><span>☆</span>
+					</div>
+				</div>
+				<p data-fortune-text class="fortune-text m-0 mt-2 text-xs leading-5 text-black/50 dark:text-white/50">
+					点击按钮后，今日的风会给你一个答案。
+				</p>
+				{forecastImageUrls.length > 0 && (
+					<figure data-forecast-card class="forecast-card" hidden>
+						<img data-forecast-image src="" alt="今日运势配图" loading="lazy" decoding="async" />
+					</figure>
+				)}
 			</div>
 		</div>
 	</div>
 </date-time-panel>
 
 <script>
+	type DailyFortuneRecord = {
+		date: string;
+		rawScore: number;
+		image?: string;
+		version: 1;
+	};
+
 	class DateTimePanel extends HTMLElement {
+		private readonly storageKey = "fuwari:daily-fortune";
 		private timerId?: number;
+		private fortuneAnimationId?: number;
+		private fortuneKey?: string;
+		private fortuneRevealed = false;
 		private desktopQuery?: MediaQueryList;
 		private handleViewportChange = (event: MediaQueryListEvent) => {
 			if (event.matches) this.startTimer();
 			else this.stopTimer();
 		};
+		private handleFortuneClick = () => {
+			this.revealFortune(new Date());
+		};
 
 		connectedCallback() {
 			this.desktopQuery = window.matchMedia("(min-width: 1280px)");
 			this.desktopQuery.addEventListener("change", this.handleViewportChange);
+			this.querySelector("[data-fortune-button]")?.addEventListener("click", this.handleFortuneClick);
 			if (this.desktopQuery.matches) this.startTimer();
 		}
 
 		disconnectedCallback() {
 			this.desktopQuery?.removeEventListener("change", this.handleViewportChange);
+			this.querySelector("[data-fortune-button]")?.removeEventListener("click", this.handleFortuneClick);
 			this.stopTimer();
+			this.clearFortuneAnimation();
 		}
 
 		private startTimer() {
@@ -96,15 +156,204 @@ const initialGreeting =
 				day: String(current.getDate()).padStart(2, "0"),
 				weekday: current.toLocaleDateString("zh-CN", { weekday: "long" }),
 				year: `${current.getFullYear()} · LOCAL TIME`,
-				hour: String(hour).padStart(2, "0"),
-				minute: String(current.getMinutes()).padStart(2, "0"),
-				second: String(current.getSeconds()).padStart(2, "0"),
+				clock: `${String(hour).padStart(2, "0")}:${String(current.getMinutes()).padStart(2, "0")}:${String(current.getSeconds()).padStart(2, "0")}`,
 				greeting: hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好",
 			};
 
 			for (const [key, value] of Object.entries(values)) {
 				const element = this.querySelector(`[data-${key}]`);
 				if (element) element.textContent = value;
+			}
+
+			this.prepareFortune(current);
+		}
+
+		private clearFortuneAnimation() {
+			if (this.fortuneAnimationId === undefined) return;
+			window.clearTimeout(this.fortuneAnimationId);
+			this.fortuneAnimationId = undefined;
+		}
+
+		private prepareFortune(date: Date) {
+			const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+			if (this.fortuneKey === key) return;
+			this.fortuneKey = key;
+			this.fortuneRevealed = false;
+			this.clearFortuneAnimation();
+			this.classList.toggle("fortune-rescued", false);
+			this.classList.toggle("fortune-rescuing", false);
+
+			const stored = this.readStoredFortune(key);
+			if (stored) {
+				this.showStoredFortune(stored);
+				return;
+			}
+
+			this.resetFortune();
+		}
+
+		private revealFortune(date: Date) {
+			this.prepareFortune(date);
+			if (this.fortuneRevealed) return;
+			this.fortuneRevealed = true;
+
+			const button = this.querySelector("[data-fortune-button]");
+			const result = this.querySelector("[data-fortune-result]");
+			button?.setAttribute("hidden", "");
+			result?.removeAttribute("hidden");
+
+			const key = this.fortuneKey ?? `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+			const rawScore = this.getRandomInt(6);
+			const image = this.pickForecastImage();
+			const needsRescue = rawScore <= 1;
+			const finalScore = needsRescue ? 5 : rawScore;
+			this.writeStoredFortune({ date: key, rawScore, image, version: 1 });
+			this.revealForecastImage(image);
+
+			this.classList.toggle("fortune-rescued", false);
+			this.classList.toggle("fortune-rescuing", false);
+			this.renderFortune(rawScore, needsRescue ? "低星预警" : "今日定格");
+
+			if (!needsRescue) return;
+
+			this.classList.add("fortune-rescuing");
+			this.fortuneAnimationId = window.setTimeout(() => {
+				this.renderFortune(finalScore, "反转成功");
+				this.classList.remove("fortune-rescuing");
+				this.classList.add("fortune-rescued");
+				this.fortuneAnimationId = undefined;
+			}, 1400);
+		}
+
+		private showStoredFortune(record: DailyFortuneRecord) {
+			this.fortuneRevealed = true;
+			this.clearFortuneAnimation();
+			this.querySelector("[data-fortune-button]")?.setAttribute("hidden", "");
+			this.querySelector("[data-fortune-result]")?.removeAttribute("hidden");
+
+			const wasRescued = record.rawScore <= 1;
+			this.classList.toggle("fortune-rescuing", false);
+			this.classList.toggle("fortune-rescued", wasRescued);
+			this.renderFortune(wasRescued ? 5 : record.rawScore, wasRescued ? "反转成功" : "今日已抽");
+			this.revealForecastImage(record.image);
+		}
+
+		private resetFortune() {
+			this.querySelector("[data-fortune-button]")?.removeAttribute("hidden");
+			this.querySelector("[data-fortune-result]")?.setAttribute("hidden", "");
+
+			const title = this.querySelector("[data-fortune-title]");
+			const stars = this.querySelector("[data-fortune-stars]");
+			const text = this.querySelector("[data-fortune-text]");
+			const badgeElement = this.querySelector("[data-fortune-badge]");
+
+			if (title) title.textContent = "待开启";
+			if (text) text.textContent = "点击按钮后，今日的风会给你一个答案。";
+			if (badgeElement) badgeElement.textContent = "未揭晓";
+			if (stars) {
+				stars.setAttribute("aria-label", "今日运势未揭晓");
+				stars.innerHTML = "<span>☆</span><span>☆</span><span>☆</span><span>☆</span><span>☆</span>";
+			}
+			this.resetForecastImage();
+		}
+
+		private revealForecastImage(selected?: string) {
+			const card = this.querySelector("[data-forecast-card]");
+			const image = this.querySelector<HTMLImageElement>("[data-forecast-image]");
+			if (!card || !image || !selected) return;
+
+			image.src = selected;
+			image.alt = `今日运势配图：${decodeURIComponent(selected.split("/").pop() ?? "")}`;
+			card.removeAttribute("hidden");
+		}
+
+		private resetForecastImage() {
+			const card = this.querySelector("[data-forecast-card]");
+			const image = this.querySelector<HTMLImageElement>("[data-forecast-image]");
+			card?.setAttribute("hidden", "");
+			if (image) {
+				image.removeAttribute("src");
+				image.alt = "今日运势配图";
+			}
+		}
+
+		private pickForecastImage() {
+			const pool = this.getForecastPool();
+			return pool.length > 0 ? pool[this.getRandomInt(pool.length)] : undefined;
+		}
+
+		private getForecastPool() {
+			try {
+				const pool = JSON.parse(this.dataset.forecastPool ?? "[]");
+				return Array.isArray(pool) ? pool.filter((item): item is string => typeof item === "string") : [];
+			} catch {
+				return [];
+			}
+		}
+
+		private getRandomInt(max: number) {
+			if (max <= 0) return 0;
+			if (window.crypto?.getRandomValues) {
+				const values = new Uint32Array(1);
+				window.crypto.getRandomValues(values);
+				return values[0] % max;
+			}
+			return Math.floor(Math.random() * max);
+		}
+
+		private readStoredFortune(dateKey: string): DailyFortuneRecord | null {
+			try {
+				const raw = window.localStorage.getItem(this.storageKey);
+				if (!raw) return null;
+				const record = JSON.parse(raw) as Partial<DailyFortuneRecord>;
+				if (record.date !== dateKey) {
+					window.localStorage.removeItem(this.storageKey);
+					return null;
+				}
+				if (record.version !== 1 || typeof record.rawScore !== "number" || record.rawScore < 0 || record.rawScore > 5) return null;
+				if (record.image !== undefined && typeof record.image !== "string") return null;
+				const image = record.image && this.getForecastPool().includes(record.image) ? record.image : undefined;
+				return {
+					date: dateKey,
+					rawScore: Math.trunc(record.rawScore),
+					image,
+					version: 1,
+				};
+			} catch {
+				return null;
+			}
+		}
+
+		private writeStoredFortune(record: DailyFortuneRecord) {
+			try {
+				window.localStorage.setItem(this.storageKey, JSON.stringify(record));
+			} catch {
+				// If localStorage is blocked, the draw still works for the current page view.
+			}
+		}
+
+		private renderFortune(score: number, badge: string) {
+			const titles = ["大凶", "小凶", "平", "小吉", "中吉", "大吉"];
+			const texts = [
+				"云层低垂，先别急着硬冲。给自己一杯热茶和一点耐心，运势正在改写。",
+				"小有波折，但不必泄气。慢一点、稳一点，好消息已经在路上拐弯。",
+				"今日平稳，适合整理计划。把手边的小事做好，心气会慢慢顺起来。",
+				"微光入窗，适合推进想做的事。先迈出一步，后面的路会自己亮起来。",
+				"顺风已至，适合表达、学习与行动。认真把握当下，会收获不错的回响。",
+				"吉运自来，能享盛名，把握机会，必获成功。人生路上机会众多，只要把握好一次机会，将会改写您的人生。",
+			];
+
+			const title = this.querySelector("[data-fortune-title]");
+			const stars = this.querySelector("[data-fortune-stars]");
+			const text = this.querySelector("[data-fortune-text]");
+			const badgeElement = this.querySelector("[data-fortune-badge]");
+
+			if (title) title.textContent = titles[score];
+			if (text) text.textContent = texts[score];
+			if (badgeElement) badgeElement.textContent = badge;
+			if (stars) {
+				stars.setAttribute("aria-label", `今日运势 ${score} 星`);
+				stars.innerHTML = Array.from({ length: 5 }, (_, index) => `<span class="${index < score ? "is-on" : ""}">${index < score ? "★" : "☆"}</span>`).join("");
 			}
 		}
 	}
@@ -119,6 +368,10 @@ const initialGreeting =
 		isolation: isolate;
 		border: 1px solid rgb(255 255 255 / 0.28);
 		box-shadow: 0 0.8rem 2.2rem rgb(29 35 58 / 0.08);
+	}
+
+	.date-panel [hidden] {
+		display: none !important;
 	}
 
 	.date-panel::after {
@@ -204,12 +457,253 @@ const initialGreeting =
 		animation: soft-blink 2s ease-in-out infinite;
 	}
 
+	.clock-text {
+		letter-spacing: 0;
+		white-space: nowrap;
+	}
+
+	.fortune-panel {
+		position: relative;
+	}
+
+	.fortune-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.42rem;
+		width: 100%;
+		min-height: 2.45rem;
+		border: 1px solid color-mix(in oklch, var(--primary) 18%, white 72%);
+		border-radius: 0.75rem;
+		background:
+			linear-gradient(135deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.24)),
+			color-mix(in oklch, var(--primary) 9%, transparent);
+		color: var(--primary);
+		font-size: 0.78rem;
+		font-weight: 850;
+		box-shadow: 0 0.55rem 1.25rem rgb(31 38 63 / 0.08);
+		transition:
+			background-color 180ms ease,
+			box-shadow 180ms ease,
+			transform 180ms ease;
+	}
+
+	.fortune-button:hover {
+		box-shadow: 0 0.75rem 1.6rem rgb(31 38 63 / 0.13);
+		transform: translateY(-0.06rem);
+	}
+
+	.fortune-button:active {
+		transform: translateY(0.02rem) scale(0.985);
+	}
+
+	:global(.dark) .fortune-button {
+		border-color: color-mix(in oklch, var(--primary) 25%, rgb(21 27 38) 70%);
+		background:
+			linear-gradient(135deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025)),
+			color-mix(in oklch, var(--primary) 18%, transparent);
+		box-shadow: 0 0.55rem 1.25rem rgb(0 0 0 / 0.18);
+	}
+
+	.fortune-result {
+		animation: fortune-result-in 260ms ease both;
+	}
+
+	.fortune-badge {
+		flex: 0 0 auto;
+		border-radius: 0.45rem;
+		background: color-mix(in oklch, var(--primary) 12%, white 82%);
+		padding: 0.18rem 0.42rem;
+		color: var(--primary);
+		font-size: 0.58rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+	}
+
+	:global(.dark) .fortune-badge {
+		background: color-mix(in oklch, var(--primary) 24%, rgb(21 27 38) 76%);
+	}
+
+	.fortune-title {
+		transition:
+			color 220ms ease,
+			transform 220ms ease;
+	}
+
+	.fortune-stars {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.05rem;
+		flex: 0 0 auto;
+		color: rgb(0 0 0 / 0.2);
+		font-size: 0.96rem;
+		font-weight: 900;
+		line-height: 1;
+		letter-spacing: 0;
+	}
+
+	:global(.dark) .fortune-stars {
+		color: rgb(255 255 255 / 0.22);
+	}
+
+	.fortune-stars .is-on {
+		color: oklch(0.78 0.16 82);
+		text-shadow: 0 0.18rem 0.8rem oklch(0.78 0.16 82 / 0.25);
+	}
+
+	.fortune-text {
+		overflow-wrap: anywhere;
+	}
+
+	.forecast-card {
+		position: relative;
+		margin: 0.85rem 0 0;
+		padding-left: 0.7rem;
+		animation: forecast-card-in 360ms ease both;
+	}
+
+	.forecast-card::before {
+		position: absolute;
+		top: 0.15rem;
+		bottom: 0.15rem;
+		left: 0;
+		width: 0.16rem;
+		border-radius: 9999px;
+		background: color-mix(in oklch, var(--primary) 24%, rgb(255 255 255 / 38%));
+		content: "";
+	}
+
+	.forecast-card img {
+		display: block;
+		width: 100%;
+		max-height: 13.5rem;
+		border: 1px solid rgb(255 255 255 / 0.42);
+		border-radius: 0.82rem;
+		background: rgb(255 255 255 / 0.45);
+		box-shadow: 0 0.65rem 1.35rem rgb(31 38 63 / 0.14);
+		object-fit: cover;
+		object-position: center;
+	}
+
+	:global(.dark) .forecast-card img {
+		border-color: rgb(255 255 255 / 0.1);
+		background: rgb(255 255 255 / 0.06);
+		box-shadow: 0 0.65rem 1.35rem rgb(0 0 0 / 0.24);
+	}
+
+	.fortune-rescuing .fortune-panel::after {
+		position: absolute;
+		inset: 0;
+		border-radius: 0.85rem;
+		background: linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 0.62) 42%, transparent 72%);
+		content: "";
+		pointer-events: none;
+		transform: translateX(-120%);
+		animation: fortune-sweep 1.15s ease-in-out forwards;
+	}
+
+	:global(.dark) .fortune-rescuing .fortune-panel::after {
+		background: linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 0.14) 42%, transparent 72%);
+	}
+
+	.fortune-rescuing .fortune-title {
+		color: oklch(0.62 0.18 28);
+		animation: fortune-shake 620ms ease-in-out both;
+	}
+
+	.fortune-rescued .fortune-title {
+		color: var(--primary);
+		transform: translateY(-0.04rem);
+	}
+
+	.fortune-rescued .fortune-stars .is-on {
+		animation: fortune-star-pop 520ms cubic-bezier(0.2, 1.35, 0.4, 1) both;
+	}
+
+	.fortune-rescued .fortune-stars .is-on:nth-child(2) {
+		animation-delay: 45ms;
+	}
+
+	.fortune-rescued .fortune-stars .is-on:nth-child(3) {
+		animation-delay: 90ms;
+	}
+
+	.fortune-rescued .fortune-stars .is-on:nth-child(4) {
+		animation-delay: 135ms;
+	}
+
+	.fortune-rescued .fortune-stars .is-on:nth-child(5) {
+		animation-delay: 180ms;
+	}
+
+	@keyframes fortune-result-in {
+		from {
+			transform: translateY(0.28rem);
+			opacity: 0;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@keyframes forecast-card-in {
+		from {
+			transform: translateY(0.4rem) scale(0.97);
+			opacity: 0;
+		}
+		to {
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+	}
+
+	@keyframes fortune-sweep {
+		to {
+			transform: translateX(120%);
+		}
+	}
+
+	@keyframes fortune-shake {
+		0%, 100% {
+			transform: translateX(0);
+		}
+		35% {
+			transform: translateX(-0.12rem);
+		}
+		70% {
+			transform: translateX(0.12rem);
+		}
+	}
+
+	@keyframes fortune-star-pop {
+		0% {
+			transform: translateY(0.25rem) scale(0.45);
+			opacity: 0.25;
+		}
+		70% {
+			transform: translateY(-0.08rem) scale(1.22);
+			opacity: 1;
+		}
+		100% {
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+	}
+
 	@keyframes soft-blink {
 		0%, 100% { opacity: 1; }
 		50% { opacity: 0.35; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.time-colon { animation: none; }
+		.time-colon,
+		.fortune-result,
+		.forecast-card,
+		.fortune-rescuing .fortune-panel::after,
+		.fortune-rescuing .fortune-title,
+		.fortune-rescued .fortune-stars .is-on {
+			animation: none;
+		}
 	}
 </style>

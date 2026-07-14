@@ -2,10 +2,25 @@
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
-import { getSortedPostsList } from "../utils/content-utils";
+import { Icon } from "astro-icon/components";
+import { getSortedPosts } from "../utils/content-utils";
 import { getPostUrlBySlug } from "../utils/url-utils";
 
-const allPosts = await getSortedPostsList();
+const rawPosts = await getSortedPosts();
+const allPosts = await Promise.all(
+	rawPosts.map(async (post) => {
+		const { remarkPluginFrontmatter } = await post.render();
+
+		return {
+			...post,
+			stats: {
+				words: remarkPluginFrontmatter.words ?? 0,
+				minutes: remarkPluginFrontmatter.minutes ?? 1,
+				excerpt: remarkPluginFrontmatter.excerpt ?? "",
+			},
+		};
+	}),
+);
 
 const grouped: Record<number, typeof allPosts> = {};
 for (const post of allPosts) {
@@ -26,7 +41,7 @@ function formatDateFull(date: Date) {
 	const year = date.getFullYear();
 	const month = String(date.getMonth() + 1).padStart(2, "0");
 	const day = String(date.getDate()).padStart(2, "0");
-	return `${year}.${month}.${day}`;
+	return `${year}-${month}-${day}`;
 }
 function formatTag(tagList: string[]) {
 	return tagList.map((t) => `#${t}`).join(" ");
@@ -67,7 +82,7 @@ function formatTag(tagList: string[]) {
 
 	<!-- Query-based filters are applied in the browser so they also work on a statically built site. -->
 	<section id="archive-filter-view" class="hidden" aria-live="polite">
-		<header class="archive-filter-header card-base relative mb-4 overflow-hidden px-5 py-5 sm:px-7">
+		<header class="hidden">
 			<div class="filter-glow" aria-hidden="true"></div>
 			<div class="relative z-10 flex items-end justify-between gap-4">
 				<div>
@@ -79,26 +94,48 @@ function formatTag(tagList: string[]) {
 			</div>
 		</header>
 
-		<div id="archive-cards" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+		<div id="archive-cards" class="flex flex-col gap-4">
 			{allPosts.map((post) => (
 				<a
 					href={getPostUrlBySlug(post.slug)}
 					data-tags={JSON.stringify(post.data.tags)}
 					data-category={post.data.category ?? ""}
-					class="archive-card-item card-base group relative min-h-44 overflow-hidden border border-white/20 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+					class="archive-card-item card-base group relative block overflow-hidden border border-white/25 p-5 pr-[4.9rem] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:p-7 sm:pr-[6.5rem]"
 				>
-					<div class="card-accent" aria-hidden="true"></div>
-					<div class="relative z-10 flex items-center justify-between gap-3">
-						<span class="rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-[0.68rem] font-bold text-[var(--primary)]">{post.data.category ?? "代码"}</span>
-						<time class="text-xs font-semibold tracking-wide text-black/35 dark:text-white/35">{formatDateFull(new Date(post.data.published))}</time>
-					</div>
-					<h2 class="relative z-10 mb-2 mt-4 line-clamp-2 text-lg font-bold text-black/80 transition group-hover:text-[var(--primary)] dark:text-white/85">
+					<h2 class="relative z-10 mb-4 line-clamp-2 pl-4 text-2xl font-bold leading-tight text-black/85 transition group-hover:text-[var(--primary)] dark:text-white/90 sm:text-3xl">
 						{post.data.title}
 					</h2>
-					{post.data.description && (
-						<p class="relative z-10 mb-0 line-clamp-2 text-sm leading-6 text-black/50 dark:text-white/50">{post.data.description}</p>
-					)}
-					<div class="relative z-10 mt-4 truncate text-xs text-black/30 dark:text-white/30">{formatTag(post.data.tags)}</div>
+					<div class="relative z-10 mb-4 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm font-semibold text-black/45 dark:text-white/45">
+						<div class="archive-meta-item">
+							<span class="archive-meta-icon">
+								<Icon name="material-symbols:calendar-today-outline-rounded" />
+							</span>
+							<time>{formatDateFull(new Date(post.data.published))}</time>
+						</div>
+						<div class="archive-meta-item">
+							<span class="archive-meta-icon">
+								<Icon name="material-symbols:book-2-outline-rounded" />
+							</span>
+							<span>{post.data.category ?? "代码"}</span>
+						</div>
+						<div class="archive-meta-item archive-tags">
+							<span class="archive-meta-icon">
+								<Icon name="material-symbols:tag-rounded" />
+							</span>
+							<span>{post.data.tags.join(" / ") || "无标签"}</span>
+						</div>
+					</div>
+					<p class="relative z-10 mb-4 line-clamp-2 text-base leading-7 text-black/70 dark:text-white/70">
+						{post.data.description || post.stats.excerpt}
+					</p>
+					<div class="relative z-10 flex items-center gap-4 text-sm font-medium text-black/35 transition dark:text-white/35">
+						<span>{post.stats.words} {i18n(post.stats.words === 1 ? I18nKey.wordCount : I18nKey.wordsCount)}</span>
+						<span>|</span>
+						<span>{post.stats.minutes} {i18n(post.stats.minutes === 1 ? I18nKey.minuteCount : I18nKey.minutesCount)}</span>
+					</div>
+					<div class="archive-enter" aria-hidden="true">
+						<Icon name="material-symbols:chevron-right-rounded" />
+					</div>
 				</a>
 			))}
 		</div>
@@ -226,9 +263,122 @@ if (!archiveWindow.__archiveFilterHookAdded && window.swup?.hooks) {
 		transform: scale(1.35);
 	}
 
+	.archive-card-item {
+		isolation: isolate;
+		border-radius: 1.35rem;
+	}
+
+	.archive-card-item::before {
+		content: "";
+		position: absolute;
+		top: 1.7rem;
+		left: 1.55rem;
+		z-index: 1;
+		width: 0.28rem;
+		height: 1.65rem;
+		border-radius: 9999px;
+		background: var(--primary);
+	}
+
+	.archive-card-item::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		background:
+			linear-gradient(115deg, rgb(255 255 255 / 0.28), transparent 58%),
+			color-mix(in oklch, var(--primary) 5%, transparent);
+		pointer-events: none;
+	}
+
+	.archive-meta-item {
+		display: inline-flex;
+		align-items: center;
+		min-width: 0;
+		gap: 0.7rem;
+	}
+
+	.archive-tags {
+		max-width: 100%;
+	}
+
+	.archive-tags > span:last-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.archive-meta-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 auto;
+		width: 2.4rem;
+		height: 2.4rem;
+		border-radius: 0.55rem;
+		background: color-mix(in oklch, var(--primary) 13%, white 82%);
+		color: var(--primary);
+		font-size: 1.45rem;
+	}
+
+	.archive-enter {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+		bottom: 1rem;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 3.6rem;
+		border-radius: 1rem;
+		background: color-mix(in oklch, var(--primary) 13%, white 84%);
+		color: var(--primary);
+		font-size: 2.8rem;
+		transition:
+			background-color 200ms ease,
+			transform 200ms ease;
+	}
+
+	.archive-card-item:hover .archive-enter {
+		background: color-mix(in oklch, var(--primary) 20%, white 78%);
+		transform: translateX(0.12rem);
+	}
+
+	:global(.dark) .archive-card-item::after {
+		background:
+			linear-gradient(115deg, rgb(255 255 255 / 0.08), transparent 58%),
+			color-mix(in oklch, var(--primary) 11%, transparent);
+	}
+
+	:global(.dark) .archive-meta-icon,
+	:global(.dark) .archive-enter {
+		background: color-mix(in oklch, var(--primary) 24%, rgb(21 27 38) 76%);
+	}
+
+	@media (max-width: 640px) {
+		.archive-card-item::before {
+			top: 1.45rem;
+			left: 1.1rem;
+		}
+
+		.archive-enter {
+			right: 0.75rem;
+			width: 2.9rem;
+			font-size: 2.25rem;
+		}
+
+		.archive-meta-icon {
+			width: 2.1rem;
+			height: 2.1rem;
+			font-size: 1.25rem;
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		.archive-card-item,
-		.card-accent {
+		.card-accent,
+		.archive-enter {
 			transition: none;
 		}
 	}
