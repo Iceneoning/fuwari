@@ -1,6 +1,6 @@
 ---
 import { existsSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { Icon } from "astro-icon/components";
 
 const now = new Date();
@@ -20,19 +20,25 @@ const initialGreeting =
 			: now.getHours() < 18
 				? "下午好"
 				: "晚上好";
-const forecastDir = fileURLToPath(new URL("../../../public/DailyForecast/", import.meta.url));
+const forecastDir = resolve("public", "DailyForecast");
 const forecastImages = existsSync(forecastDir)
 	? readdirSync(forecastDir, { withFileTypes: true })
-			.filter((entry) => entry.isFile() && /\.(avif|gif|jpe?g|png|webp)$/i.test(entry.name))
+			.filter(
+				(entry) =>
+					entry.isFile() && /\.(avif|gif|jpe?g|png|webp)$/i.test(entry.name),
+			)
 			.map((entry) => entry.name)
 			.sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true }))
 	: [];
-const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encodeURIComponent(image)}`);
+const forecastImageUrls = forecastImages.map(
+	(image) => `/DailyForecast/${encodeURIComponent(image)}`,
+);
 ---
 
-<date-time-panel class="date-panel card-base relative block overflow-hidden p-4" data-forecast-pool={JSON.stringify(forecastImageUrls)} aria-label="当前日期与时间">
-	<div class="date-panel-glow" aria-hidden="true"></div>
-	<div class="relative z-10">
+<date-time-panel class="date-panel block" data-forecast-pool={JSON.stringify(forecastImageUrls)} aria-label="当前日期与时间">
+	<div class="date-panel-card card-base relative overflow-hidden p-4">
+		<div class="date-panel-glow" aria-hidden="true"></div>
+		<div class="relative z-10">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-2 text-[0.68rem] font-bold tracking-[0.16em] text-black/40 dark:text-white/40">
 				<span class="grid h-7 w-7 place-items-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
@@ -89,14 +95,15 @@ const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encode
 				<p data-fortune-text class="fortune-text m-0 mt-2 text-xs leading-5 text-black/50 dark:text-white/50">
 					点击按钮后，今日的风会给你一个答案。
 				</p>
-				{forecastImageUrls.length > 0 && (
-					<figure data-forecast-card class="forecast-card" hidden>
-						<img data-forecast-image src="" alt="今日运势配图" loading="lazy" decoding="async" />
-					</figure>
-				)}
 			</div>
 		</div>
 	</div>
+	</div>
+	{forecastImageUrls.length > 0 && (
+		<figure data-forecast-card class="forecast-card" hidden>
+			<img data-forecast-image src="" alt="今日运势配图" loading="lazy" decoding="async" />
+		</figure>
+	)}
 </date-time-panel>
 
 <script>
@@ -235,7 +242,11 @@ const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encode
 			this.classList.toggle("fortune-rescuing", false);
 			this.classList.toggle("fortune-rescued", wasRescued);
 			this.renderFortune(wasRescued ? 5 : record.rawScore, wasRescued ? "反转成功" : "今日已抽");
-			this.revealForecastImage(record.image);
+			const image = record.image ?? this.pickForecastImage();
+			if (image && image !== record.image) {
+				this.writeStoredFortune({ ...record, image });
+			}
+			this.revealForecastImage(image);
 		}
 
 		private resetFortune() {
@@ -364,9 +375,10 @@ const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encode
 </script>
 
 <style>
-	.date-panel {
+	.date-panel-card {
 		isolation: isolate;
 		border: 1px solid rgb(255 255 255 / 0.28);
+		border-radius: var(--radius-large);
 		box-shadow: 0 0.8rem 2.2rem rgb(29 35 58 / 0.08);
 	}
 
@@ -374,7 +386,7 @@ const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encode
 		display: none !important;
 	}
 
-	.date-panel::after {
+	.date-panel-card::after {
 		position: absolute;
 		inset: 0;
 		z-index: 0;
@@ -556,33 +568,18 @@ const forecastImageUrls = forecastImages.map((image) => `/DailyForecast/${encode
 	}
 
 	.forecast-card {
-		position: relative;
-		margin: 0.85rem 0 0;
-		padding-left: 0.7rem;
+		margin: 0.75rem 0 0;
 		animation: forecast-card-in 360ms ease both;
-	}
-
-	.forecast-card::before {
-		position: absolute;
-		top: 0.15rem;
-		bottom: 0.15rem;
-		left: 0;
-		width: 0.16rem;
-		border-radius: 9999px;
-		background: color-mix(in oklch, var(--primary) 24%, rgb(255 255 255 / 38%));
-		content: "";
 	}
 
 	.forecast-card img {
 		display: block;
 		width: 100%;
-		max-height: 13.5rem;
+		height: auto;
 		border: 1px solid rgb(255 255 255 / 0.42);
-		border-radius: 0.82rem;
+		border-radius: var(--radius-large);
 		background: rgb(255 255 255 / 0.45);
 		box-shadow: 0 0.65rem 1.35rem rgb(31 38 63 / 0.14);
-		object-fit: cover;
-		object-position: center;
 	}
 
 	:global(.dark) .forecast-card img {

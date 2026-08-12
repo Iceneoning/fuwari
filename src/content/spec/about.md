@@ -1,5 +1,5 @@
 # 关于
-这是 [Fuwari](https://github.com/saicaca/fuwari) 的演示站点。
+本站基于 [Fuwari](https://github.com/saicaca/fuwari) 构建。
 
 ::github{repo="saicaca/fuwari"}
 
