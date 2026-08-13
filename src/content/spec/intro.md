@@ -2,6 +2,13 @@
 
 欢迎来到我的个人小站，这里会记录我关于游戏、代码和生活的内容。
 
+## 站点信息
+
+- 站点名称：冰霓の梦之旅
+- 站点描述：分享生活趣事，学习技术，做好游戏
+- 站点地址：<https://iceneoning-blog.pages.dev/>
+- 头像地址：<https://iceneoning-blog.pages.dev/Portrait/Iceneoning.webp>
+
 ## 我会在这里写什么
 
 - 游戏体验与通关心得

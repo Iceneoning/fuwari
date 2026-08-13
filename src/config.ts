@@ -9,6 +9,7 @@ import type {
 export const siteConfig: SiteConfig = {
 	title: "冰霓の梦之旅",
 	subtitle: "",
+	description: "分享生活趣事，学习技术，做好游戏",
 	lang: "zh_CN", // Language code, e.g. 'en', 'zh_CN', 'ja', etc.
 	themeColor: {
 		hue: 250, // Default hue for the theme color, from 0 to 360. e.g. red: 0, teal: 200, cyan: 250, pink: 345
@@ -77,7 +78,7 @@ export const navBarConfig: NavBarConfig = {
 };
 
 export const profileConfig: ProfileConfig = {
-	avatar: "assets/images/demo-avatar.webp", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
+	avatar: "/Portrait/Iceneoning.webp",
 	name: "冰霓Iceneon",
 	bio: "你好啊，很高心认识你。",
 	links: [
