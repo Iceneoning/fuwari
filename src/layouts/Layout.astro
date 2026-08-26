@@ -179,6 +179,7 @@ const backgroundImageUrl = backgroundConfig.src.startsWith("/")
 		<slot name="head"></slot>
 
 		<link rel="alternate" type="application/rss+xml" title={profileConfig.name} href={`${Astro.site}rss.xml`}/>
+		{backgroundConfig.enable && <link rel="preload" href={backgroundImageUrl} as="image" fetchpriority="high" />}
 		<link rel="preload" href={roboto400} as="font" type="font/woff2" crossorigin>
 		<link rel="preload" href={roboto700} as="font" type="font/woff2" crossorigin>
 
@@ -427,6 +428,49 @@ function initCustomScrollbar() {
 	});
 }
 
+function applyArchiveFilters() {
+	const params = new URLSearchParams(window.location.search);
+	const tagFilter = params.getAll("tag");
+	const categoryFilter = params.getAll("category");
+	const uncategorized = params.get("uncategorized");
+	const isFiltered = tagFilter.length > 0 || categoryFilter.length > 0 || uncategorized !== null;
+
+	const timeline = document.getElementById("archive-timeline");
+	const filterView = document.getElementById("archive-filter-view");
+	if (!timeline || !filterView) return;
+
+	timeline.classList.toggle("hidden", isFiltered);
+	filterView.classList.toggle("hidden", !isFiltered);
+	if (!isFiltered) return;
+
+	const labels: Record<string, { title: string; description: string }> = {
+		杂谈: { title: "杂谈", description: "生活见闻、兴趣经历与随想" },
+		代码: { title: "代码", description: "编程学习、技术实践与创作记录" },
+	};
+	const currentLabel = categoryFilter.length === 1 ? labels[categoryFilter[0]] : null;
+	const filterTitle = filterView.querySelector<HTMLElement>("[data-filter-title]");
+	const filterDescription = filterView.querySelector<HTMLElement>("[data-filter-description]");
+	if (filterTitle) filterTitle.textContent = currentLabel?.title ?? tagFilter[0] ?? categoryFilter[0] ?? "精选文章";
+	if (filterDescription) filterDescription.textContent = currentLabel?.description ?? "按文章元数据精确筛选";
+
+	let visibleCount = 0;
+	const cards = filterView.querySelectorAll<HTMLElement>(".archive-card-item");
+	for (const card of cards) {
+		const tags: string[] = JSON.parse(card.dataset.tags || "[]");
+		const category = card.dataset.category || "";
+		let matches = true;
+		if (matches && tagFilter.length > 0) matches = tagFilter.some((tag) => tags.includes(tag));
+		if (matches && categoryFilter.length > 0) matches = categoryFilter.includes(category);
+		if (matches && uncategorized !== null) matches = !category;
+		card.classList.toggle("hidden", !matches);
+		if (matches) visibleCount += 1;
+	}
+
+	const count = filterView.querySelector<HTMLElement>("[data-filter-count]");
+	if (count) count.textContent = String(visibleCount).padStart(2, "0");
+	document.getElementById("archive-empty")?.classList.toggle("hidden", visibleCount > 0);
+}
+
 function showBanner() {
 	if (!siteConfig.banner.enable) return;
 
@@ -444,6 +488,7 @@ function init() {
 	loadTheme();
 	loadHue();
 	initCustomScrollbar();
+	applyArchiveFilters();
 	showBanner();
 }
 
@@ -464,9 +509,6 @@ const setup = () => {
 	})
 */
 	window.swup.hooks.on('link:click', () => {
-		// Remove the delay for the first time page load
-		document.documentElement.style.setProperty('--content-delay', '0ms')
-
 		// prevent elements from overlapping the navbar
 		if (!bannerEnabled) {
 			return
@@ -503,6 +545,7 @@ const setup = () => {
 		}
 	});
 	window.swup.hooks.on('page:view', () => {
+		applyArchiveFilters()
 		// hide the temp high element when the transition is done
 		const heightExtend = document.getElementById('page-height-extend')
 		if (heightExtend) {

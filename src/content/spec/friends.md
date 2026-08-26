@@ -15,6 +15,19 @@ friends:
   - name: 南柯一梦
     url: https://super-s-blog.pages.dev/
     avatar: /Portrait/NanKeYiMeng.jpg
+friendRules:
+  - 您的网站拥有正式、可稳定访问的域名，并保持定期更新和维护。
+  - 网站内容健康、合法，不包含违法、侵权或敏感内容。
+  - 申请前请先为本站添加友情链接。
+  - 不接受纯商业推广、采集站或缺少原创内容的站点。
+friendApplication:
+  email: woshisos@foxmail.com
+  description: 请在邮件中附上站点名称、链接、简介与头像地址，我会尽快回复。
+siteInfo:
+  name: 冰霓の梦之旅
+  url: https://iceneoning-blog.pages.dev/
+  description: 分享生活趣事，学习技术，做好游戏。
+  avatar: https://iceneoning-blog.pages.dev/Portrait/Iceneoning.webp
 ---
 
 # 友之屋

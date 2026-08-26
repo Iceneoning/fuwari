@@ -201,15 +201,10 @@ class TableOfContents extends HTMLElement {
     };
 
     connectedCallback() {
-        // wait for the onload animation to finish, which makes the `getBoundingClientRect` return correct values
-        const element = document.querySelector('.prose');
-        if (element) {
-            element.addEventListener('animationend', () => {
-                this.init();
-            }, { once: true });
-        } else {
-            console.debug('Animation element not found');
-        }
+        // The shell no longer replays an entrance animation on hard refresh.
+        // Wait one frame so the replaced article has completed layout before
+        // measuring its sections.
+        requestAnimationFrame(() => this.init());
     };
 
     init() {

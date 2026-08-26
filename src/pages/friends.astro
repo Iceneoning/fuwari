@@ -11,6 +11,9 @@ if (!friendsPost) {
 
 const { Content } = await render(friendsPost);
 const friends = friendsPost.data.friends ?? [];
+const friendRules = friendsPost.data.friendRules ?? [];
+const friendApplication = friendsPost.data.friendApplication;
+const siteInfo = friendsPost.data.siteInfo;
 
 function getDomain(rawUrl: string) {
 	try {
@@ -87,6 +90,57 @@ function getDomain(rawUrl: string) {
 			}
 		</div>
 	</section>
+
+	<section class="friend-guide card-base relative mt-4 overflow-hidden px-5 py-6 sm:px-8 sm:py-8">
+		<div class="guide-grid">
+			<div>
+				<div class="section-kicker">
+					<Icon name="material-symbols:handshake-outline-rounded" />
+					LINK EXCHANGE
+				</div>
+				<h2 class="section-title">交换规则</h2>
+				<p class="section-lead">认真经营的小站，值得被认真地介绍。</p>
+				<ul class="rule-list">
+					{friendRules.map((rule) => (
+						<li>
+							<span class="rule-check"><Icon name="material-symbols:check-rounded" /></span>
+							<span>{rule}</span>
+						</li>
+					))}
+				</ul>
+			</div>
+
+			<div class="application-card">
+				<div class="application-icon"><Icon name="material-symbols:outgoing-mail-rounded" /></div>
+				<div>
+					<h2 class="section-title !text-xl">申请方式</h2>
+					<p>{friendApplication?.description}</p>
+				</div>
+				{friendApplication && (
+					<a class="mail-button" href={`mailto:${friendApplication.email}?subject=${encodeURIComponent("申请交换友链")}`}>
+						<Icon name="fa6-regular:envelope" />
+						联系我
+					</a>
+				)}
+			</div>
+		</div>
+
+		{siteInfo && (
+			<div class="site-info">
+				<div class="site-info-title">
+					<Icon name="material-symbols:badge-outline-rounded" />
+					<div><span>本站友链信息</span><small>复制以下内容即可添加本站</small></div>
+				</div>
+				<dl>
+					<div><dt>站点名称</dt><dd>{siteInfo.name}</dd></div>
+					<div><dt>站点链接</dt><dd><a href={siteInfo.url}>{siteInfo.url}</a></dd></div>
+					<div><dt>站点简介</dt><dd>{siteInfo.description}</dd></div>
+					<div><dt>头像 / 图标</dt><dd><a href={siteInfo.avatar} target="_blank" rel="noopener noreferrer">{siteInfo.avatar}</a></dd></div>
+				</dl>
+			</div>
+		)}
+	</section>
+
 </MainGridLayout>
 
 <style>
@@ -185,6 +239,235 @@ function getDomain(rawUrl: string) {
 		border-radius: 9999px;
 		object-fit: cover;
 		object-position: center;
+	}
+
+	.friend-guide {
+		isolation: isolate;
+		border: 1px solid rgb(255 255 255 / 0.2);
+	}
+
+	.guide-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.8fr);
+		gap: 1.5rem;
+	}
+
+	.section-kicker {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		color: var(--primary);
+		font-size: 0.72rem;
+		font-weight: 800;
+		letter-spacing: 0.16em;
+	}
+
+	.section-kicker :global(svg) {
+		font-size: 1rem;
+	}
+
+	.section-title {
+		margin: 0.55rem 0 0;
+		color: rgb(0 0 0 / 0.84);
+		font-size: 1.75rem;
+		font-weight: 800;
+		line-height: 1.2;
+	}
+
+	:global(.dark) .section-title {
+		color: rgb(255 255 255 / 0.9);
+	}
+
+	.section-lead {
+		margin: 0.65rem 0 0;
+		color: rgb(0 0 0 / 0.48);
+		font-size: 0.88rem;
+	}
+
+	:global(.dark) .section-lead {
+		color: rgb(255 255 255 / 0.48);
+	}
+
+	.rule-list {
+		display: grid;
+		gap: 0.8rem;
+		margin: 1.4rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.rule-list li {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		color: rgb(0 0 0 / 0.62);
+		font-size: 0.9rem;
+		line-height: 1.65;
+	}
+
+	:global(.dark) .rule-list li {
+		color: rgb(255 255 255 / 0.62);
+	}
+
+	.rule-check {
+		display: grid;
+		flex: 0 0 auto;
+		width: 1.45rem;
+		height: 1.45rem;
+		margin-top: 0.05rem;
+		place-items: center;
+		border-radius: 9999px;
+		background: color-mix(in oklch, var(--primary) 15%, transparent);
+		color: var(--primary);
+	}
+
+	.application-card {
+		display: flex;
+		align-content: flex-start;
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1.35rem;
+		border: 1px solid rgb(255 255 255 / 0.3);
+		border-radius: 1.25rem;
+		background: linear-gradient(145deg, color-mix(in oklch, var(--primary) 12%, white 62%), rgb(255 255 255 / 0.24));
+	}
+
+	:global(.dark) .application-card {
+		border-color: rgb(255 255 255 / 0.09);
+		background: linear-gradient(145deg, color-mix(in oklch, var(--primary) 18%, rgb(21 27 38) 82%), rgb(255 255 255 / 0.025));
+	}
+
+	.application-card p {
+		margin: 0.6rem 0 0;
+		color: rgb(0 0 0 / 0.52);
+		font-size: 0.86rem;
+		line-height: 1.65;
+	}
+
+	:global(.dark) .application-card p {
+		color: rgb(255 255 255 / 0.52);
+	}
+
+	.application-icon {
+		display: grid;
+		width: 3rem;
+		height: 3rem;
+		place-items: center;
+		border-radius: 0.9rem;
+		background: var(--primary);
+		color: white;
+		font-size: 1.5rem;
+		box-shadow: 0 0.7rem 1.5rem color-mix(in oklch, var(--primary) 24%, transparent);
+	}
+
+	.mail-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.55rem;
+		width: 100%;
+		margin-top: auto;
+		padding: 0.75rem 1rem;
+		border-radius: 0.85rem;
+		background: var(--primary);
+		color: white;
+		font-size: 0.88rem;
+		font-weight: 800;
+		text-decoration: none;
+		transition: transform 180ms ease, filter 180ms ease;
+	}
+
+	.mail-button:hover {
+		filter: brightness(1.08);
+		transform: translateY(-1px);
+	}
+
+	.site-info {
+		display: grid;
+		grid-template-columns: minmax(12rem, 0.35fr) minmax(0, 1fr);
+		gap: 1.5rem;
+		margin-top: 1.5rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid rgb(0 0 0 / 0.07);
+	}
+
+	:global(.dark) .site-info {
+		border-color: rgb(255 255 255 / 0.08);
+	}
+
+	.site-info-title {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		color: var(--primary);
+		font-size: 1.6rem;
+	}
+
+	.site-info-title div {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.site-info-title span {
+		color: rgb(0 0 0 / 0.76);
+		font-size: 0.95rem;
+		font-weight: 800;
+	}
+
+	:global(.dark) .site-info-title span {
+		color: rgb(255 255 255 / 0.8);
+	}
+
+	.site-info-title small {
+		color: rgb(0 0 0 / 0.38);
+		font-size: 0.72rem;
+	}
+
+	:global(.dark) .site-info-title small {
+		color: rgb(255 255 255 / 0.38);
+	}
+
+	.site-info dl {
+		display: grid;
+		gap: 0.65rem;
+		margin: 0;
+	}
+
+	.site-info dl > div {
+		display: grid;
+		grid-template-columns: 5rem minmax(0, 1fr);
+		gap: 0.7rem;
+		min-width: 0;
+	}
+
+	.site-info dt {
+		color: rgb(0 0 0 / 0.36);
+		font-size: 0.78rem;
+		font-weight: 700;
+	}
+
+	.site-info dd {
+		min-width: 0;
+		margin: 0;
+		overflow-wrap: anywhere;
+		color: rgb(0 0 0 / 0.65);
+		font-size: 0.82rem;
+	}
+
+	.site-info a {
+		color: var(--primary);
+	}
+
+	:global(.dark) .site-info dt { color: rgb(255 255 255 / 0.36); }
+	:global(.dark) .site-info dd { color: rgb(255 255 255 / 0.65); }
+
+	@media (max-width: 720px) {
+		.guide-grid,
+		.site-info {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	:global(.dark) .friend-avatar-ring {

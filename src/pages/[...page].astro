@@ -19,7 +19,6 @@ export const getStaticPaths = (async ({ paginate }) => {
 
 const { page } = Astro.props;
 
-const len = page.data.length;
 const isFirstPage = page.currentPage === 1;
 const allPosts = isFirstPage ? await getSortedPosts() : [];
 const featuredPost = allPosts[0];
@@ -31,7 +30,7 @@ const featuredImageBasePath = featuredPost?.data.image
 
 <MainGridLayout>
 	{isFirstPage && featuredPost && (
-		<section class="card-base p-4 onload-animation mb-4">
+		<section class="card-base p-4 mb-4">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-2">
 					<span class="h-5 w-1 rounded-full bg-[var(--primary)]"></span>
@@ -85,5 +84,5 @@ const featuredImageBasePath = featuredPost?.data.image
 		</section>
 	)}
     <PostPage page={page}></PostPage>
-    <Pagination class="mx-auto onload-animation" page={page} style={`animation-delay: calc(var(--content-delay) + ${(len)*50}ms)`}></Pagination>
+    <Pagination class="mx-auto" page={page}></Pagination>
 </MainGridLayout>

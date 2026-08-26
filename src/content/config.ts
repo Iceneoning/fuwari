@@ -52,6 +52,21 @@ const specCollection = defineCollection({
 				}),
 			)
 			.optional(),
+		friendRules: z.array(z.string().trim().min(1)).optional().default([]),
+		friendApplication: z
+			.object({
+				email: z.string().email("友链联系邮箱格式不正确"),
+				description: z.string().trim().optional().default(""),
+			})
+			.optional(),
+		siteInfo: z
+			.object({
+				name: z.string().trim().min(1),
+				url: z.string().url("本站友链地址必须是完整 URL"),
+				description: z.string().trim().min(1),
+				avatar: z.string().trim().min(1),
+			})
+			.optional(),
 	}),
 });
 export const collections = {

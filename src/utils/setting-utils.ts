@@ -4,7 +4,7 @@ import {
 	DEFAULT_THEME,
 	LIGHT_MODE,
 } from "@constants/constants.ts";
-import { expressiveCodeConfig } from "@/config";
+import { expressiveCodeConfig, siteConfig } from "@/config";
 import type { LIGHT_DARK_MODE } from "@/types/config";
 
 type ThemeColorPreset = {
@@ -36,13 +36,15 @@ function getClosestPreset(hue: number): ThemeColorPreset {
 }
 
 export function getDefaultHue(): number {
-	const fallback = "250";
+	const fallback = String(siteConfig.themeColor.hue);
+	if (typeof document === "undefined") return getClosestPreset(Number(fallback)).hue;
 	const configCarrier = document.getElementById("config-carrier");
 	const defaultHue = Number.parseInt(configCarrier?.dataset.hue || fallback, 10);
 	return getClosestPreset(defaultHue).hue;
 }
 
 export function getHue(): number {
+	if (typeof localStorage === "undefined") return getDefaultHue();
 	const stored = localStorage.getItem("hue");
 	const hue = stored ? Number.parseInt(stored, 10) : getDefaultHue();
 	return getClosestPreset(hue).hue;
@@ -50,6 +52,7 @@ export function getHue(): number {
 
 export function setHue(hue: number): void {
 	const preset = getClosestPreset(hue);
+	if (typeof document === "undefined" || typeof localStorage === "undefined") return;
 	localStorage.setItem("hue", String(preset.hue));
 	const r = document.querySelector(":root") as HTMLElement;
 	if (!r) {
