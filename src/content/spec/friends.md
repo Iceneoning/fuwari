@@ -12,9 +12,14 @@ friends:
     url: https://hagumiaoi.pages.dev/
     avatar: /Portrait/Moi.webp
     description: AI生图之路
-  - name: 南柯一梦
+  - name: 甘雨的狗
     url: https://super-s-blog.pages.dev/
     avatar: /Portrait/NanKeYiMeng.jpg
+    description: 月相流转之间，我以我为锚点。
+  - name: 一曝十寒
+    url: https://yuhhhy.cn/
+    avatar: /Portrait/avatar.jpg
+    description: 纵使不安彷徨，即便茫然无措，也依然迈步前行
 friendRules:
   - 您的网站拥有正式、可稳定访问的域名，并保持定期更新和维护。
   - 网站内容健康、合法，不包含违法、侵权或敏感内容。
