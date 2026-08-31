@@ -20,6 +20,7 @@
 ## 📚 自定义文档
 
 - [导航字段修改与新增指南](./NAVBAR_FIELDS.zh-CN.md)
+- [性能优化专题](./performance-optimization/README.md)
 
 ## 👀 要求
 

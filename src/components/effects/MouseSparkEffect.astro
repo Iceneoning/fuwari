@@ -55,10 +55,10 @@
       this.baseFrameMs = 1000 / 60;
       this.maxDeltaMs = 100;
       this.lastFrameTime = performance.now();
+      this.frameId = null;
 
       this.initCanvas();
       this.bindEvents();
-      requestAnimationFrame((now) => this.loop(now));
     }
 
     alpha(value) {
@@ -123,6 +123,7 @@
               f: 0.95,
             });
           }
+          this.requestFrame();
         }
       });
 
@@ -137,8 +138,18 @@
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
           this.isDown = false;
+        } else {
+          this.requestFrame();
         }
       });
+    }
+
+    requestFrame() {
+      if (this.frameId !== null || !this.ctx || document.hidden) {
+        return;
+      }
+      this.lastFrameTime = performance.now();
+      this.frameId = requestAnimationFrame((now) => this.loop(now));
     }
 
     boom(x, y) {
@@ -209,9 +220,11 @@
         }
         this.sparks.push(spark);
       }
+      this.requestFrame();
     }
 
     loop(now) {
+      this.frameId = null;
       if (!this.ctx) {
         return;
       }
@@ -336,7 +349,9 @@
         this.ctx.globalCompositeOperation = "source-over";
       }
 
-      requestAnimationFrame((nextNow) => this.loop(nextNow));
+      if (this.waves.length > 0 || this.sparks.length > 0 || this.trail.length > 0) {
+        this.requestFrame();
+      }
     }
   }
 

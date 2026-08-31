@@ -1,7 +1,11 @@
 ---
-import "@fontsource/roboto/400.css";
-import "@fontsource/roboto/500.css";
-import "@fontsource/roboto/700.css";
+import "@fontsource/roboto/latin-400.css";
+import "@fontsource/roboto/latin-500.css";
+import "@fontsource/roboto/latin-700.css";
+import "../styles/main.css";
+import "../styles/scrollbar.css";
+import "../styles/transition.css";
+import "../styles/variables.styl";
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import MouseSparkEffect from "@components/effects/MouseSparkEffect.astro";
 import roboto400 from "@fontsource/roboto/files/roboto-latin-400-normal.woff2";
@@ -82,9 +86,7 @@ const backgroundImageUrl = backgroundConfig.src.startsWith("/")
 ---
 
 <!DOCTYPE html>
-<html lang={siteLang} class="bg-[var(--page-bg)] transition text-[14px] md:text-[16px]"
-	  data-overlayscrollbars-initialize
->
+<html lang={siteLang} class="bg-[var(--page-bg)] transition text-[14px] md:text-[16px]">
 	<head>
 
 		<title>{pageTitle}</title>
@@ -184,9 +186,7 @@ const backgroundImageUrl = backgroundConfig.src.startsWith("/")
 		<link rel="preload" href={roboto700} as="font" type="font/woff2" crossorigin>
 
 	</head>
-	<body class=" min-h-screen transition " class:list={[{"lg:is-home": isHomePage, "enable-banner": enableBanner}]}
-		  data-overlayscrollbars-initialize
-	>
+	<body class=" min-h-screen transition " class:list={[{"lg:is-home": isHomePage, "enable-banner": enableBanner}]}>
 		{backgroundConfig.enable && (
 			<>
 				<div id="site-bg-image" aria-hidden="true" style={`background-image: url('${backgroundImageUrl}')`}></div>
@@ -272,13 +272,6 @@ const backgroundImageUrl = backgroundConfig.src.startsWith("/")
 </style>
 
 <script>
-import 'overlayscrollbars/overlayscrollbars.css';
-import {
-	OverlayScrollbars,
-	// ScrollbarsHidingPlugin,
-	// SizeObserverPlugin,
-	// ClickScrollPlugin
-} from 'overlayscrollbars';
 import {getHue, getStoredTheme, setHue, setTheme} from "../utils/setting-utils";
 import {pathsEqual, url} from "../utils/url-utils";
 import {
@@ -363,71 +356,6 @@ function loadHue() {
 	setHue(getHue())
 }
 
-function initCustomScrollbar() {
-	const bodyElement = document.querySelector('body');
-	if (!bodyElement) return;
-	OverlayScrollbars(
-		// docs say that a initialization to the body element would affect native functionality like window.scrollTo
-		// but just leave it here for now
-		{
-			target: bodyElement,
-			cancel: {
-				nativeScrollbarsOverlaid: true,    // don't initialize the overlay scrollbar if there is a native one
-			}
-		}, {
-		scrollbars: {
-			theme: 'scrollbar-base scrollbar-auto py-1',
-			autoHide: 'move',
-			autoHideDelay: 500,
-			autoHideSuspend: false,
-		},
-	});
-
-	const katexElements = document.querySelectorAll('.katex-display') as NodeListOf<HTMLElement>;
-
-	const katexObserverOptions = {
-		root: null,
-		rootMargin: '100px',
-		threshold: 0.1
-	};
-
-	const processKatexElement = (element: HTMLElement) => {
-		if (!element.parentNode) return;
-		if (element.hasAttribute('data-scrollbar-initialized')) return;
-
-		const container = document.createElement('div');
-		container.className = 'katex-display-container';
-		container.setAttribute('aria-label', 'scrollable container for formulas');
-
-		element.parentNode.insertBefore(container, element);
-		container.appendChild(element);
-
-		OverlayScrollbars(container, {
-			scrollbars: {
-				theme: 'scrollbar-base scrollbar-auto',
-				autoHide: 'leave',
-				autoHideDelay: 500,
-				autoHideSuspend: false
-			}
-		});
-
-		element.setAttribute('data-scrollbar-initialized', 'true');
-	};
-
-	const katexObserver = new IntersectionObserver((entries, observer) => {
-		entries.forEach(entry => {
-			if (entry.isIntersecting) {
-			processKatexElement(entry.target as HTMLElement);
-			observer.unobserve(entry.target);
-			}
-		});
-	}, katexObserverOptions);
-
-	katexElements.forEach(element => {
-		katexObserver.observe(element);
-	});
-}
-
 function applyArchiveFilters() {
 	const params = new URLSearchParams(window.location.search);
 	const tagFilter = params.getAll("tag");
@@ -487,7 +415,6 @@ function init() {
 	// disableAnimation()()		// TODO
 	loadTheme();
 	loadHue();
-	initCustomScrollbar();
 	applyArchiveFilters();
 	showBanner();
 }
@@ -518,11 +445,10 @@ const setup = () => {
 		if (!navbar || !document.body.classList.contains('lg:is-home')) {
 			return
 		}
-		if (document.body.scrollTop >= threshold || document.documentElement.scrollTop >= threshold) {
+		if (window.scrollY >= threshold) {
 			navbar.classList.add('navbar-hidden')
 		}
 	})
-	window.swup.hooks.on('content:replace', initCustomScrollbar)
 	window.swup.hooks.on('visit:start', (visit: {to: {url: string}}) => {
 		// change banner height immediately when a link is clicked
 		const bodyElement = document.querySelector('body')
@@ -576,23 +502,21 @@ if (window?.swup?.hooks) {
 let backToTopBtn = document.getElementById('back-to-top-btn');
 let toc = document.getElementById('toc-wrapper');
 let navbar = document.getElementById('navbar-wrapper')
+let scrollFrame: number | null = null
 function scrollFunction() {
-	let bannerHeight = window.innerHeight * (BANNER_HEIGHT / 100)
+	scrollFrame = null
+	const viewportHeight = window.innerHeight
+	const viewportWidth = window.innerWidth
+	const scrollTop = window.scrollY
+	const bannerHeight = viewportHeight * (BANNER_HEIGHT / 100)
+	const hasPassedBanner = scrollTop > bannerHeight
 
 	if (backToTopBtn) {
-		if (document.body.scrollTop > bannerHeight || document.documentElement.scrollTop > bannerHeight) {
-			backToTopBtn.classList.remove('hide')
-		} else {
-			backToTopBtn.classList.add('hide')
-		}
+		backToTopBtn.classList.toggle('hide', !hasPassedBanner)
 	}
 
 	if (bannerEnabled && toc) {
-		if (document.body.scrollTop > bannerHeight || document.documentElement.scrollTop > bannerHeight) {
-			toc.classList.remove('toc-hide')
-		} else {
-			toc.classList.add('toc-hide')
-		}
+		toc.classList.toggle('toc-hide', !hasPassedBanner)
 	}
 
 	if (!bannerEnabled) return
@@ -601,31 +525,51 @@ function scrollFunction() {
 		const MAIN_PANEL_EXCESS_HEIGHT = MAIN_PANEL_OVERLAPS_BANNER_HEIGHT * 16			// The height the main panel overlaps the banner
 
 		let bannerHeight = BANNER_HEIGHT
-		if (document.body.classList.contains('lg:is-home') && window.innerWidth >= 1024) {
+		if (document.body.classList.contains('lg:is-home') && viewportWidth >= 1024) {
 			bannerHeight = BANNER_HEIGHT_HOME
 		}
-		let threshold = window.innerHeight * (bannerHeight / 100) - NAVBAR_HEIGHT - MAIN_PANEL_EXCESS_HEIGHT - 16
-		if (document.body.scrollTop >= threshold || document.documentElement.scrollTop >= threshold) {
-			navbar.classList.add('navbar-hidden')
-		} else {
-			navbar.classList.remove('navbar-hidden')
-		}
+		const threshold = viewportHeight * (bannerHeight / 100) - NAVBAR_HEIGHT - MAIN_PANEL_EXCESS_HEIGHT - 16
+		navbar.classList.toggle('navbar-hidden', scrollTop >= threshold)
 	}
 }
-window.onscroll = scrollFunction
 
-window.onresize = () => {
-	// calculate the --banner-height-extend, which needs to be a multiple of 4 to avoid blurry text
-	let offset = Math.floor(window.innerHeight * (BANNER_HEIGHT_EXTEND / 100));
-	offset = offset - offset % 4;
-	document.documentElement.style.setProperty('--banner-height-extend', `${offset}px`);
+function scheduleScrollUpdate() {
+	if (scrollFrame !== null) return
+	scrollFrame = requestAnimationFrame(scrollFunction)
 }
+
+window.addEventListener('scroll', scheduleScrollUpdate, { passive: true })
+
+let resizeFrame: number | null = null
+window.addEventListener('resize', () => {
+	if (resizeFrame !== null) return
+	resizeFrame = requestAnimationFrame(() => {
+		resizeFrame = null
+		// calculate the --banner-height-extend, which needs to be a multiple of 4 to avoid blurry text
+		let offset = Math.floor(window.innerHeight * (BANNER_HEIGHT_EXTEND / 100));
+		offset = offset - offset % 4;
+		document.documentElement.style.setProperty('--banner-height-extend', `${offset}px`);
+		scheduleScrollUpdate()
+	})
+}, { passive: true })
+
+scheduleScrollUpdate()
 
 </script>
 
 <script>
 let lightbox: any = null
 let pswpPromise: Promise<any> | null = null
+
+function installPhotoSwipeStyles(...stylesheets: string[]) {
+	const styleId = "photoswipe-styles"
+	if (document.getElementById(styleId)) return
+
+	const style = document.createElement("style")
+	style.id = styleId
+	style.textContent = stylesheets.join("\n")
+	document.head.appendChild(style)
+}
 
 function loadPhotoSwipe() {
 	pswpPromise ??= import("photoswipe")
@@ -640,10 +584,16 @@ async function createPhotoSwipe() {
 
 	loadPhotoSwipe()
 
-	const [{ default: PhotoSwipeLightbox }] = await Promise.all([
+	const [
+		{ default: PhotoSwipeLightbox },
+		{ default: photoSwipeBaseStyles },
+		{ default: photoSwipeThemeStyles },
+	] = await Promise.all([
 		import("photoswipe/lightbox"),
-		import("photoswipe/style.css"),
+		import("photoswipe/style.css?inline"),
+		import("../styles/photoswipe.css?inline"),
 	])
+	installPhotoSwipeStyles(photoSwipeBaseStyles, photoSwipeThemeStyles)
 
 	lightbox = new PhotoSwipeLightbox({
 		gallery: ".custom-md img, #post-cover img",
