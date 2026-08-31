@@ -3,12 +3,12 @@ import path from "node:path";
 import type { GetStaticPaths } from "astro";
 import { Icon } from "astro-icon/components";
 import Pagination from "../components/control/Pagination.astro";
-import PostPage from "../components/PostPage.astro";
 import ImageWrapper from "../components/misc/ImageWrapper.astro";
+import PostPage from "../components/PostPage.astro";
 import { PAGE_SIZE } from "../constants/constants";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
-import { formatDateToYYYYMMDD } from "../utils/date-utils";
 import { getSortedPosts } from "../utils/content-utils";
+import { formatDateToYYYYMMDD } from "../utils/date-utils";
 import { getDir, getPostUrlBySlug } from "../utils/url-utils";
 
 export const getStaticPaths = (async ({ paginate }) => {
@@ -30,7 +30,7 @@ const featuredImageBasePath = featuredPost?.data.image
 
 <MainGridLayout>
 	{isFirstPage && featuredPost && (
-		<section class="card-base p-4 mb-4">
+		<section class="home-navigation card-base p-4 mb-4">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-2">
 					<span class="h-5 w-1 rounded-full bg-[var(--primary)]"></span>
@@ -43,10 +43,10 @@ const featuredImageBasePath = featuredPost?.data.image
 					</span>
 				</a>
 			</div>
-			<div class="mt-4 grid grid-cols-1 lg:grid-cols-[18rem_minmax(0,_1fr)] gap-4">
-				<a href={getPostUrlBySlug(featuredPost.slug)} class="card-base overflow-hidden flex flex-col sm:flex-row">
+			<div class="home-navigation-grid mt-4 grid grid-cols-1 gap-4">
+				<a href={getPostUrlBySlug(featuredPost.slug)} class="featured-post-card card-base overflow-hidden flex flex-col">
 					{featuredPost.data.image && (
-						<div class="sm:w-60 w-full h-40 sm:h-auto">
+						<div class="featured-post-media w-full h-40 shrink-0">
 							<ImageWrapper
 								class="w-full h-full object-cover"
 								src={featuredPost.data.image}
@@ -86,3 +86,31 @@ const featuredImageBasePath = featuredPost?.data.image
     <PostPage page={page}></PostPage>
     <Pagination class="mx-auto" page={page}></Pagination>
 </MainGridLayout>
+
+<style>
+	.home-navigation {
+		container-type: inline-size;
+	}
+
+	/* The featured card can become horizontal as soon as its own container has
+	   enough room, independent of the viewport-level sidebar breakpoints. */
+	@container (min-width: 36rem) {
+		.featured-post-card {
+			flex-direction: row;
+		}
+
+		.featured-post-media {
+			width: 15rem;
+			height: auto;
+			flex-basis: 15rem;
+		}
+	}
+
+	/* Split the navigation into two columns only when the main content column
+	   can accommodate both useful minimum widths. */
+	@container (min-width: 49rem) {
+		.home-navigation-grid {
+			grid-template-columns: minmax(30rem, 1.15fr) minmax(17rem, 0.85fr);
+		}
+	}
+</style>
