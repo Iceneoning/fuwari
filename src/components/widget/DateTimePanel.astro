@@ -20,7 +20,7 @@ const initialGreeting =
 			: now.getHours() < 18
 				? "下午好"
 				: "晚上好";
-const forecastDir = resolve("public", "DailyForecast");
+const forecastDir = resolve("public", "DailyForecast", "optimized");
 const forecastImages = existsSync(forecastDir)
 	? readdirSync(forecastDir, { withFileTypes: true })
 			.filter(
@@ -31,7 +31,7 @@ const forecastImages = existsSync(forecastDir)
 			.sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true }))
 	: [];
 const forecastImageUrls = forecastImages.map(
-	(image) => `/DailyForecast/${encodeURIComponent(image)}`,
+	(image) => `/DailyForecast/optimized/${encodeURIComponent(image)}`,
 );
 ---
 
@@ -120,24 +120,44 @@ const forecastImageUrls = forecastImages.map(
 		private fortuneAnimationId?: number;
 		private fortuneKey?: string;
 		private fortuneRevealed = false;
+		private forecastPool?: string[];
+		private lastHour?: number;
 		private desktopQuery?: MediaQueryList;
+		private clockElement?: HTMLElement | null;
+		private monthElement?: HTMLElement | null;
+		private dayElement?: HTMLElement | null;
+		private weekdayElement?: HTMLElement | null;
+		private yearElement?: HTMLElement | null;
+		private greetingElement?: HTMLElement | null;
 		private handleViewportChange = (event: MediaQueryListEvent) => {
-			if (event.matches) this.startTimer();
+			if (event.matches && !document.hidden) this.startTimer();
 			else this.stopTimer();
+		};
+		private handleVisibilityChange = () => {
+			if (document.hidden) this.stopTimer();
+			else if (this.desktopQuery?.matches) this.startTimer();
 		};
 		private handleFortuneClick = () => {
 			this.revealFortune(new Date());
 		};
 
 		connectedCallback() {
+			this.clockElement = this.querySelector("[data-clock]");
+			this.monthElement = this.querySelector("[data-month]");
+			this.dayElement = this.querySelector("[data-day]");
+			this.weekdayElement = this.querySelector("[data-weekday]");
+			this.yearElement = this.querySelector("[data-year]");
+			this.greetingElement = this.querySelector("[data-greeting]");
 			this.desktopQuery = window.matchMedia("(min-width: 1280px)");
 			this.desktopQuery.addEventListener("change", this.handleViewportChange);
+			document.addEventListener("visibilitychange", this.handleVisibilityChange);
 			this.querySelector("[data-fortune-button]")?.addEventListener("click", this.handleFortuneClick);
-			if (this.desktopQuery.matches) this.startTimer();
+			if (this.desktopQuery.matches && !document.hidden) this.startTimer();
 		}
 
 		disconnectedCallback() {
 			this.desktopQuery?.removeEventListener("change", this.handleViewportChange);
+			document.removeEventListener("visibilitychange", this.handleVisibilityChange);
 			this.querySelector("[data-fortune-button]")?.removeEventListener("click", this.handleFortuneClick);
 			this.stopTimer();
 			this.clearFortuneAnimation();
@@ -146,7 +166,16 @@ const forecastImageUrls = forecastImages.map(
 		private startTimer() {
 			if (this.timerId !== undefined) return;
 			this.updateDateTime();
-			this.timerId = window.setInterval(() => this.updateDateTime(), 1000);
+			this.scheduleNextTick();
+		}
+
+		private scheduleNextTick() {
+			const delay = 1000 - (Date.now() % 1000) + 20;
+			this.timerId = window.setTimeout(() => {
+				this.timerId = undefined;
+				this.updateDateTime();
+				if (this.desktopQuery?.matches && !document.hidden) this.scheduleNextTick();
+			}, delay);
 		}
 
 		private stopTimer() {
@@ -158,21 +187,30 @@ const forecastImageUrls = forecastImages.map(
 		updateDateTime() {
 			const current = new Date();
 			const hour = current.getHours();
-			const values = {
-				month: current.toLocaleDateString("zh-CN", { month: "long" }),
-				day: String(current.getDate()).padStart(2, "0"),
-				weekday: current.toLocaleDateString("zh-CN", { weekday: "long" }),
-				year: `${current.getFullYear()} · LOCAL TIME`,
-				clock: `${String(hour).padStart(2, "0")}:${String(current.getMinutes()).padStart(2, "0")}:${String(current.getSeconds()).padStart(2, "0")}`,
-				greeting: hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好",
-			};
+			this.updateText(
+				this.clockElement,
+				`${String(hour).padStart(2, "0")}:${String(current.getMinutes()).padStart(2, "0")}:${String(current.getSeconds()).padStart(2, "0")}`,
+			);
 
-			for (const [key, value] of Object.entries(values)) {
-				const element = this.querySelector(`[data-${key}]`);
-				if (element) element.textContent = value;
-			}
-
+			const previousFortuneKey = this.fortuneKey;
 			this.prepareFortune(current);
+			if (this.fortuneKey !== previousFortuneKey) {
+				this.updateText(this.monthElement, current.toLocaleDateString("zh-CN", { month: "long" }));
+				this.updateText(this.dayElement, String(current.getDate()).padStart(2, "0"));
+				this.updateText(this.weekdayElement, current.toLocaleDateString("zh-CN", { weekday: "long" }));
+				this.updateText(this.yearElement, `${current.getFullYear()} · LOCAL TIME`);
+			}
+			if (this.lastHour !== hour) {
+				this.lastHour = hour;
+				this.updateText(
+					this.greetingElement,
+					hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好",
+				);
+			}
+		}
+
+		private updateText(element: HTMLElement | null | undefined, value: string) {
+			if (element && element.textContent !== value) element.textContent = value;
 		}
 
 		private clearFortuneAnimation() {
@@ -215,21 +253,66 @@ const forecastImageUrls = forecastImages.map(
 			const needsRescue = rawScore <= 1;
 			const finalScore = needsRescue ? 5 : rawScore;
 			this.writeStoredFortune({ date: key, rawScore, image, version: 1 });
-			this.revealForecastImage(image);
-
+			this.resetForecastImage();
+			this.classList.toggle("fortune-drawing", false);
+			this.classList.toggle("fortune-revealed", false);
 			this.classList.toggle("fortune-rescued", false);
 			this.classList.toggle("fortune-rescuing", false);
-			this.renderFortune(rawScore, needsRescue ? "低星预警" : "今日定格");
+			this.setFortuneBusy(true);
 
-			if (!needsRescue) return;
+			if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+				this.finishFortune(rawScore, needsRescue, image);
+				return;
+			}
 
-			this.classList.add("fortune-rescuing");
+			this.renderFortunePending();
+			this.classList.add("fortune-drawing");
 			this.fortuneAnimationId = window.setTimeout(() => {
-				this.renderFortune(finalScore, "反转成功");
-				this.classList.remove("fortune-rescuing");
-				this.classList.add("fortune-rescued");
-				this.fortuneAnimationId = undefined;
-			}, 1400);
+				this.classList.remove("fortune-drawing");
+				this.renderFortune(rawScore, needsRescue ? "低星预警" : "今日定格");
+				if (!needsRescue) {
+					this.classList.add("fortune-revealed");
+					this.revealForecastImage(image);
+					this.setFortuneBusy(false);
+					this.fortuneAnimationId = undefined;
+					return;
+				}
+
+				this.classList.add("fortune-rescuing");
+				this.fortuneAnimationId = window.setTimeout(() => {
+					this.renderFortune(finalScore, "反转成功");
+					this.classList.remove("fortune-rescuing");
+					this.classList.add("fortune-rescued", "fortune-revealed");
+					this.revealForecastImage(image);
+					this.setFortuneBusy(false);
+					this.fortuneAnimationId = undefined;
+				}, 1100);
+			}, 850);
+		}
+
+		private finishFortune(rawScore: number, needsRescue: boolean, image?: string) {
+			this.renderFortune(needsRescue ? 5 : rawScore, needsRescue ? "反转成功" : "今日定格");
+			this.classList.toggle("fortune-rescued", needsRescue);
+			this.revealForecastImage(image);
+			this.setFortuneBusy(false);
+		}
+
+		private renderFortunePending() {
+			const title = this.querySelector("[data-fortune-title]");
+			const stars = this.querySelector("[data-fortune-stars]");
+			const text = this.querySelector("[data-fortune-text]");
+			const badgeElement = this.querySelector("[data-fortune-badge]");
+			if (title) title.textContent = "星轨流转";
+			if (text) text.textContent = "正在倾听今天的风，请稍候片刻……";
+			if (badgeElement) badgeElement.textContent = "占卜中";
+			if (stars) {
+				stars.setAttribute("aria-label", "正在揭晓今日运势");
+				stars.innerHTML = Array.from({ length: 5 }, () => '<span class="is-pending">✦</span>').join("");
+			}
+		}
+
+		private setFortuneBusy(isBusy: boolean) {
+			this.querySelector("[data-fortune]")?.setAttribute("aria-busy", String(isBusy));
 		}
 
 		private showStoredFortune(record: DailyFortuneRecord) {
@@ -240,7 +323,10 @@ const forecastImageUrls = forecastImages.map(
 
 			const wasRescued = record.rawScore <= 1;
 			this.classList.toggle("fortune-rescuing", false);
+			this.classList.toggle("fortune-drawing", false);
+			this.classList.toggle("fortune-revealed", false);
 			this.classList.toggle("fortune-rescued", wasRescued);
+			this.setFortuneBusy(false);
 			this.renderFortune(wasRescued ? 5 : record.rawScore, wasRescued ? "反转成功" : "今日已抽");
 			const image = record.image ?? this.pickForecastImage();
 			if (image && image !== record.image) {
@@ -250,6 +336,8 @@ const forecastImageUrls = forecastImages.map(
 		}
 
 		private resetFortune() {
+			this.classList.remove("fortune-drawing", "fortune-revealed", "fortune-rescuing", "fortune-rescued");
+			this.setFortuneBusy(false);
 			this.querySelector("[data-fortune-button]")?.removeAttribute("hidden");
 			this.querySelector("[data-fortune-result]")?.setAttribute("hidden", "");
 
@@ -294,12 +382,14 @@ const forecastImageUrls = forecastImages.map(
 		}
 
 		private getForecastPool() {
+			if (this.forecastPool) return this.forecastPool;
 			try {
 				const pool = JSON.parse(this.dataset.forecastPool ?? "[]");
-				return Array.isArray(pool) ? pool.filter((item): item is string => typeof item === "string") : [];
+				this.forecastPool = Array.isArray(pool) ? pool.filter((item): item is string => typeof item === "string") : [];
 			} catch {
-				return [];
+				this.forecastPool = [];
 			}
+			return this.forecastPool;
 		}
 
 		private getRandomInt(max: number) {
@@ -476,6 +566,7 @@ const forecastImageUrls = forecastImages.map(
 
 	.fortune-panel {
 		position: relative;
+		isolation: isolate;
 	}
 
 	.fortune-button {
@@ -563,6 +654,39 @@ const forecastImageUrls = forecastImages.map(
 		text-shadow: 0 0.18rem 0.8rem oklch(0.78 0.16 82 / 0.25);
 	}
 
+	.fortune-drawing .fortune-panel {
+		animation: fortune-panel-pulse 850ms ease-in-out both;
+	}
+
+	.fortune-drawing .fortune-panel::after {
+		position: absolute;
+		inset: -0.35rem;
+		z-index: -1;
+		border: 1px solid color-mix(in oklch, var(--primary) 52%, transparent);
+		border-radius: 1rem;
+		background: radial-gradient(circle at 50% 45%, color-mix(in oklch, var(--primary) 22%, transparent), transparent 68%);
+		box-shadow: 0 0 1.4rem color-mix(in oklch, var(--primary) 26%, transparent);
+		content: "";
+		pointer-events: none;
+		animation: fortune-aura 850ms ease-in-out both;
+	}
+
+	.fortune-drawing .fortune-title {
+		color: var(--primary);
+		animation: fortune-title-breathe 700ms ease-in-out infinite alternate;
+	}
+
+	.fortune-stars .is-pending {
+		color: var(--primary);
+		text-shadow: 0 0 0.75rem color-mix(in oklch, var(--primary) 55%, transparent);
+		animation: fortune-pending-star 540ms ease-in-out infinite alternate;
+	}
+
+	.fortune-stars .is-pending:nth-child(2) { animation-delay: 90ms; }
+	.fortune-stars .is-pending:nth-child(3) { animation-delay: 180ms; }
+	.fortune-stars .is-pending:nth-child(4) { animation-delay: 270ms; }
+	.fortune-stars .is-pending:nth-child(5) { animation-delay: 360ms; }
+
 	.fortune-text {
 		overflow-wrap: anywhere;
 	}
@@ -613,24 +737,45 @@ const forecastImageUrls = forecastImages.map(
 		transform: translateY(-0.04rem);
 	}
 
-	.fortune-rescued .fortune-stars .is-on {
+	.fortune-revealed .fortune-stars .is-on {
 		animation: fortune-star-pop 520ms cubic-bezier(0.2, 1.35, 0.4, 1) both;
 	}
 
-	.fortune-rescued .fortune-stars .is-on:nth-child(2) {
+	.fortune-revealed .fortune-stars .is-on:nth-child(2) {
 		animation-delay: 45ms;
 	}
 
-	.fortune-rescued .fortune-stars .is-on:nth-child(3) {
+	.fortune-revealed .fortune-stars .is-on:nth-child(3) {
 		animation-delay: 90ms;
 	}
 
-	.fortune-rescued .fortune-stars .is-on:nth-child(4) {
+	.fortune-revealed .fortune-stars .is-on:nth-child(4) {
 		animation-delay: 135ms;
 	}
 
-	.fortune-rescued .fortune-stars .is-on:nth-child(5) {
+	.fortune-revealed .fortune-stars .is-on:nth-child(5) {
 		animation-delay: 180ms;
+	}
+
+	@keyframes fortune-panel-pulse {
+		0%, 100% { transform: scale(1); }
+		45% { transform: scale(1.025); }
+	}
+
+	@keyframes fortune-aura {
+		0% { transform: scale(0.88); opacity: 0; }
+		40% { transform: scale(1); opacity: 1; }
+		100% { transform: scale(1.08); opacity: 0; }
+	}
+
+	@keyframes fortune-title-breathe {
+		from { transform: translateY(0) scale(0.97); opacity: 0.72; }
+		to { transform: translateY(-0.08rem) scale(1.03); opacity: 1; }
+	}
+
+	@keyframes fortune-pending-star {
+		from { transform: translateY(0.16rem) scale(0.7) rotate(-12deg); opacity: 0.35; }
+		to { transform: translateY(-0.12rem) scale(1.18) rotate(12deg); opacity: 1; }
 	}
 
 	@keyframes fortune-result-in {
@@ -697,9 +842,13 @@ const forecastImageUrls = forecastImages.map(
 		.time-colon,
 		.fortune-result,
 		.forecast-card,
+		.fortune-drawing .fortune-panel,
+		.fortune-drawing .fortune-panel::after,
+		.fortune-drawing .fortune-title,
+		.fortune-stars .is-pending,
 		.fortune-rescuing .fortune-panel::after,
 		.fortune-rescuing .fortune-title,
-		.fortune-rescued .fortune-stars .is-on {
+		.fortune-revealed .fortune-stars .is-on {
 			animation: none;
 		}
 	}

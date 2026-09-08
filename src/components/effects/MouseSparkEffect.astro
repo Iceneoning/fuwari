@@ -74,9 +74,14 @@
       if (!this.ctx) {
         return;
       }
-      const dpr = window.devicePixelRatio || 1;
-      this.c.width = window.innerWidth * dpr;
-      this.c.height = window.innerHeight * dpr;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.round(window.innerWidth * dpr);
+      const height = Math.round(window.innerHeight * dpr);
+      if (this.c.width === width && this.c.height === height) {
+        return;
+      }
+      this.c.width = width;
+      this.c.height = height;
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
@@ -229,7 +234,7 @@
         return;
       }
 
-      const deltaMs = Math.min(now - this.lastFrameTime, this.maxDeltaMs);
+      const deltaMs = Math.max(0, Math.min(now - this.lastFrameTime, this.maxDeltaMs));
       this.lastFrameTime = now;
       const frameScale = (deltaMs / this.baseFrameMs) * this.speed;
 
@@ -284,7 +289,7 @@
           wave.life += frameScale;
           const progress = wave.life / wave.max;
           const ease = 1 - Math.pow(1 - Math.min(progress, 1), 3);
-          wave.r = 26 * this.scale * ease;
+          wave.r = Math.max(0, 26 * this.scale * ease);
           const alpha = Math.max(0, 1 - progress);
 
           if (alpha > 0) {

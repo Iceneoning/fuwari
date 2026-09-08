@@ -1,8 +1,8 @@
 ---
 import BackToTop from "@components/control/BackToTop.astro";
-import DateTimePanel from "@components/widget/DateTimePanel.astro";
 import Footer from "@components/Footer.astro";
 import Navbar from "@components/Navbar.astro";
+import DateTimePanel from "@components/widget/DateTimePanel.astro";
 import SideBar from "@components/widget/SideBar.astro";
 import type { MarkdownHeading } from "astro";
 import { Icon } from "astro-icon/components";
@@ -36,7 +36,6 @@ const {
 const hasBannerCredit =
 	siteConfig.banner.enable && siteConfig.banner.credit.enable;
 const hasBannerLink = !!siteConfig.banner.credit.url;
-const showDateTimePanel = headings.length === 0;
 
 const mainPanelTop = siteConfig.banner.enable
 	? `calc(${BANNER_HEIGHT}vh - ${MAIN_PANEL_OVERLAPS_BANNER_HEIGHT}rem)`
@@ -95,13 +94,11 @@ const mainPanelTop = siteConfig.banner.enable
                 </div>
             </main>
 
-            {showDateTimePanel && (
-                <aside class="hidden xl:block">
-                    <div class="sticky top-24 flex flex-col gap-4">
-                        <DateTimePanel></DateTimePanel>
-                    </div>
-                </aside>
-            )}
+            <aside class="hidden xl:block">
+                <div class="sticky top-24 flex flex-col gap-4">
+                    <DateTimePanel></DateTimePanel>
+                </div>
+            </aside>
 
             <div class="footer col-span-1 block lg:hidden">
                 <Footer></Footer>
