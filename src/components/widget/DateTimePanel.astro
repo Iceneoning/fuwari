@@ -254,10 +254,15 @@ const forecastImageUrls = forecastImages.map(
 			const finalScore = needsRescue ? 5 : rawScore;
 			this.writeStoredFortune({ date: key, rawScore, image, version: 1 });
 			this.resetForecastImage();
-			this.classList.toggle("fortune-drawing", false);
-			this.classList.toggle("fortune-revealed", false);
-			this.classList.toggle("fortune-rescued", false);
-			this.classList.toggle("fortune-rescuing", false);
+			this.classList.remove(
+				"fortune-drawing",
+				"fortune-revealed",
+				"fortune-rescued",
+				"fortune-rescuing",
+				"fortune-collapsing",
+				"fortune-transforming",
+				"fortune-finalizing",
+			);
 			this.setFortuneBusy(true);
 
 			if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -280,13 +285,28 @@ const forecastImageUrls = forecastImages.map(
 
 				this.classList.add("fortune-rescuing");
 				this.fortuneAnimationId = window.setTimeout(() => {
-					this.renderFortune(finalScore, "反转成功");
-					this.classList.remove("fortune-rescuing");
-					this.classList.add("fortune-rescued", "fortune-revealed");
-					this.revealForecastImage(image);
-					this.setFortuneBusy(false);
-					this.fortuneAnimationId = undefined;
-				}, 1100);
+					this.classList.add("fortune-collapsing");
+					this.fortuneAnimationId = window.setTimeout(() => {
+						this.renderFortuneTransforming();
+						this.classList.remove("fortune-collapsing");
+						this.classList.add("fortune-transforming");
+						this.fortuneAnimationId = window.setTimeout(() => {
+							this.classList.add("fortune-finalizing");
+							this.fortuneAnimationId = window.setTimeout(() => {
+								this.renderFortune(finalScore, "反转成功");
+								this.classList.remove(
+									"fortune-rescuing",
+									"fortune-transforming",
+									"fortune-finalizing",
+								);
+								this.classList.add("fortune-rescued", "fortune-revealed");
+								this.revealForecastImage(image);
+								this.setFortuneBusy(false);
+								this.fortuneAnimationId = undefined;
+							}, 240);
+						}, 680);
+					}, 240);
+				}, 650);
 			}, 850);
 		}
 
@@ -311,6 +331,20 @@ const forecastImageUrls = forecastImages.map(
 			}
 		}
 
+		private renderFortuneTransforming() {
+			const title = this.querySelector("[data-fortune-title]");
+			const stars = this.querySelector("[data-fortune-stars]");
+			const text = this.querySelector("[data-fortune-text]");
+			const badgeElement = this.querySelector("[data-fortune-badge]");
+			if (title) title.textContent = "命运改写中";
+			if (text) text.textContent = "散落的星光正在重新汇聚，好运即将抵达。";
+			if (badgeElement) badgeElement.textContent = "星轨逆转";
+			if (stars) {
+				stars.setAttribute("aria-label", "正在反转今日运势");
+				stars.innerHTML = Array.from({ length: 5 }, () => '<span class="is-transforming">✦</span>').join("");
+			}
+		}
+
 		private setFortuneBusy(isBusy: boolean) {
 			this.querySelector("[data-fortune]")?.setAttribute("aria-busy", String(isBusy));
 		}
@@ -322,9 +356,14 @@ const forecastImageUrls = forecastImages.map(
 			this.querySelector("[data-fortune-result]")?.removeAttribute("hidden");
 
 			const wasRescued = record.rawScore <= 1;
-			this.classList.toggle("fortune-rescuing", false);
-			this.classList.toggle("fortune-drawing", false);
-			this.classList.toggle("fortune-revealed", false);
+			this.classList.remove(
+				"fortune-rescuing",
+				"fortune-drawing",
+				"fortune-revealed",
+				"fortune-collapsing",
+				"fortune-transforming",
+				"fortune-finalizing",
+			);
 			this.classList.toggle("fortune-rescued", wasRescued);
 			this.setFortuneBusy(false);
 			this.renderFortune(wasRescued ? 5 : record.rawScore, wasRescued ? "反转成功" : "今日已抽");
@@ -336,7 +375,15 @@ const forecastImageUrls = forecastImages.map(
 		}
 
 		private resetFortune() {
-			this.classList.remove("fortune-drawing", "fortune-revealed", "fortune-rescuing", "fortune-rescued");
+			this.classList.remove(
+				"fortune-drawing",
+				"fortune-revealed",
+				"fortune-rescuing",
+				"fortune-rescued",
+				"fortune-collapsing",
+				"fortune-transforming",
+				"fortune-finalizing",
+			);
 			this.setFortuneBusy(false);
 			this.querySelector("[data-fortune-button]")?.removeAttribute("hidden");
 			this.querySelector("[data-fortune-result]")?.setAttribute("hidden", "");
@@ -732,9 +779,68 @@ const forecastImageUrls = forecastImages.map(
 		animation: fortune-shake 620ms ease-in-out both;
 	}
 
+	.fortune-collapsing .fortune-result {
+		animation: fortune-collapse 240ms cubic-bezier(0.4, 0, 1, 1) both;
+	}
+
+	.fortune-transforming .fortune-result {
+		animation: fortune-transform-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	.fortune-transforming .fortune-panel::before {
+		position: absolute;
+		inset: -0.45rem;
+		z-index: -1;
+		border-radius: 1.1rem;
+		background:
+			conic-gradient(
+				from 0deg,
+				transparent,
+				color-mix(in oklch, var(--primary) 38%, transparent),
+				transparent 34%,
+				oklch(0.78 0.16 82 / 0.28),
+				transparent 67%,
+				color-mix(in oklch, var(--primary) 42%, transparent),
+				transparent
+			);
+		box-shadow:
+			0 0 1.6rem color-mix(in oklch, var(--primary) 22%, transparent),
+			inset 0 0 1rem color-mix(in oklch, var(--primary) 12%, transparent);
+		content: "";
+		pointer-events: none;
+		animation: fortune-orbit 1.4s linear infinite;
+	}
+
+	.fortune-transforming .fortune-title {
+		color: var(--primary);
+		text-shadow: 0 0 1rem color-mix(in oklch, var(--primary) 28%, transparent);
+		animation: fortune-title-breathe 520ms ease-in-out infinite alternate;
+	}
+
+	.fortune-stars .is-transforming {
+		color: oklch(0.78 0.16 82);
+		text-shadow:
+			0 0 0.5rem oklch(0.78 0.16 82 / 0.7),
+			0 0 1rem color-mix(in oklch, var(--primary) 35%, transparent);
+		animation: fortune-star-orbit 620ms ease-in-out infinite alternate;
+	}
+
+	.fortune-stars .is-transforming:nth-child(2) { animation-delay: -100ms; }
+	.fortune-stars .is-transforming:nth-child(3) { animation-delay: -200ms; }
+	.fortune-stars .is-transforming:nth-child(4) { animation-delay: -300ms; }
+	.fortune-stars .is-transforming:nth-child(5) { animation-delay: -400ms; }
+
+	.fortune-finalizing .fortune-result {
+		animation: fortune-transform-out 240ms cubic-bezier(0.4, 0, 1, 1) both;
+	}
+
 	.fortune-rescued .fortune-title {
 		color: var(--primary);
 		transform: translateY(-0.04rem);
+	}
+
+	.fortune-rescued .fortune-result {
+		animation: fortune-final-arrival 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 	}
 
 	.fortune-revealed .fortune-stars .is-on {
@@ -776,6 +882,73 @@ const forecastImageUrls = forecastImages.map(
 	@keyframes fortune-pending-star {
 		from { transform: translateY(0.16rem) scale(0.7) rotate(-12deg); opacity: 0.35; }
 		to { transform: translateY(-0.12rem) scale(1.18) rotate(12deg); opacity: 1; }
+	}
+
+	@keyframes fortune-collapse {
+		from {
+			filter: blur(0);
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+		to {
+			filter: blur(0.35rem);
+			transform: translateY(0.3rem) scale(0.84);
+			opacity: 0;
+		}
+	}
+
+	@keyframes fortune-transform-in {
+		from {
+			filter: blur(0.45rem);
+			transform: translateY(0.45rem) scale(0.84);
+			opacity: 0;
+		}
+		to {
+			filter: blur(0);
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+	}
+
+	@keyframes fortune-transform-out {
+		from {
+			filter: blur(0);
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+		to {
+			filter: blur(0.42rem);
+			transform: translateY(-0.38rem) scale(1.08);
+			opacity: 0;
+		}
+	}
+
+	@keyframes fortune-final-arrival {
+		0% {
+			filter: blur(0.5rem);
+			transform: translateY(0.55rem) scale(0.82);
+			opacity: 0;
+		}
+		62% {
+			filter: blur(0);
+			transform: translateY(-0.08rem) scale(1.06);
+			opacity: 1;
+		}
+		100% {
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+	}
+
+	@keyframes fortune-orbit {
+		from { transform: rotate(0deg) scale(0.96); opacity: 0.55; }
+		50% { opacity: 0.95; }
+		to { transform: rotate(360deg) scale(1.04); opacity: 0.55; }
+	}
+
+	@keyframes fortune-star-orbit {
+		from { transform: translateY(0.18rem) scale(0.72) rotate(-18deg); opacity: 0.4; }
+		to { transform: translateY(-0.2rem) scale(1.28) rotate(18deg); opacity: 1; }
 	}
 
 	@keyframes fortune-result-in {
@@ -848,6 +1021,13 @@ const forecastImageUrls = forecastImages.map(
 		.fortune-stars .is-pending,
 		.fortune-rescuing .fortune-panel::after,
 		.fortune-rescuing .fortune-title,
+		.fortune-collapsing .fortune-result,
+		.fortune-transforming .fortune-result,
+		.fortune-transforming .fortune-panel::before,
+		.fortune-transforming .fortune-title,
+		.fortune-stars .is-transforming,
+		.fortune-finalizing .fortune-result,
+		.fortune-rescued .fortune-result,
 		.fortune-revealed .fortune-stars .is-on {
 			animation: none;
 		}
